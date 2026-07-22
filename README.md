@@ -1,61 +1,69 @@
-# VIEW Coach — Cloudflare Pages edition
+# VIEW Conversation Coach — mirrored Cloudflare Pages pattern
 
-This repository is designed for one Cloudflare Pages project. The static site
-and server-side API are deployed together.
+This version mirrors the structure and secret-access pattern used by the working
+`my-ai-page-Testing` project.
 
-## Repository structure
+## Repository root
 
 ```text
 /
-├── public/
-│   ├── index.html
-│   ├── app.js
-│   ├── styles.css
-│   └── _headers
-├── functions/
-│   └── api/
-│       ├── health.js
-│       └── view.js
-└── README.md
+├── index.html
+├── app.js
+├── styles.css
+├── _headers
+├── package.json
+└── functions/
+    └── api/
+        ├── health.js
+        └── view.js
 ```
 
-Do not place the whole project inside another folder in the Git repository.
-`public` and `functions` must be visible at the repository root.
+## Cloudflare Pages settings
 
-## Cloudflare Pages build settings
-
-Connect this Git repository to a Cloudflare Pages project and use:
+Use the same build settings as the working project:
 
 - Framework preset: None
 - Build command: leave blank
-- Build output directory: `public`
-- Root directory: leave blank, unless this repository is intentionally inside
-  a monorepo subdirectory
+- Build output directory: leave blank, or use the repository root if Cloudflare requires a value
+- Root directory: leave blank
 
-The `/functions` directory must remain at the Pages project root. Do not put it
-inside `public`.
+Do not use `public` as the output directory for this version.
 
-## Runtime variables and secrets
+## Runtime configuration
 
-Under the Cloudflare Pages project's **Settings → Variables and Secrets**, add:
+In the same Cloudflare Pages project, configure:
 
-- `OPENAI_API_KEY` as a secret
-- `OPENAI_ANALYSIS_MODEL` as a variable with value `gpt-5.6-terra`
+- `OPENAI_API_KEY` as a Secret
+- `OPENAI_ANALYSIS_MODEL` as a Variable with value `gpt-5.6-terra`
 
-No `.env` file is required for production. The answer model is embedded in
-`functions/api/view.js` as `gpt-5.4-mini`.
+The Function accesses the key using the same pattern as the working project:
 
-After adding or changing a binding, redeploy the Pages project.
+```js
+export async function onRequestPost(context) {
+  const { request, env } = context;
 
-## Test the deployment
+  if (!env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: "Missing OPENAI_API_KEY secret in Cloudflare." },
+      { status: 500 }
+    );
+  }
 
-Open:
+  // Authorization: `Bearer ${env.OPENAI_API_KEY}`
+}
+```
+
+No `.env` file is required for production.
+
+## Verify the binding
+
+After deployment, open:
 
 ```text
 https://YOUR-PROJECT.pages.dev/api/health
 ```
 
-Expected response:
+The response should show:
 
 ```json
 {
@@ -67,11 +75,3 @@ Expected response:
   }
 }
 ```
-
-Then open the project home page and submit a question.
-
-## Important
-
-The browser calls `/api/view` using a relative URL. This proves the static site
-and API are being served by the same Cloudflare Pages deployment. No GitHub
-Pages URL, separate Worker URL, or CORS configuration is used.

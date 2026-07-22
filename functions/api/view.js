@@ -30,9 +30,9 @@ const OUTPUT_SCHEMA = {
 
 export async function onRequestPost(context) {
   try {
-    const apiKey = context.env?.OPENAI_API_KEY;
+    const { request, env } = context;
 
-    if (!apiKey) {
+    if (!env.OPENAI_API_KEY) {
       return json({
         error:
           "OPENAI_API_KEY is not available to this Cloudflare Pages Function. " +
@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
       }, 500);
     }
 
-    const body = await context.request.json();
+    const body = await request.json();
     const question = clean(body.question, 1500);
     const clientContext = clean(body.clientContext, 1000);
     const useMarketContext = Boolean(body.useMarketContext);
@@ -50,13 +50,13 @@ export async function onRequestPost(context) {
     }
 
     const analysisModel =
-      context.env.OPENAI_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL;
+      env.OPENAI_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL;
 
     let marketContext = null;
 
     if (useMarketContext) {
       marketContext = await createMarketContext({
-        apiKey,
+        env,
         model: analysisModel,
         question,
         clientContext
@@ -64,7 +64,7 @@ export async function onRequestPost(context) {
     }
 
     const answerData = await createViewAnswers({
-      apiKey,
+      env,
       model: SIMPLE_MODEL,
       question,
       clientContext,
@@ -91,8 +91,8 @@ export async function onRequestPost(context) {
   }
 }
 
-async function createMarketContext({ apiKey, model, question, clientContext }) {
-  const response = await openAI(apiKey, {
+async function createMarketContext({ env, model, question, clientContext }) {
+  const response = await openAI(env, {
     model,
     reasoning: { effort: "medium" },
     tools: [{ type: "web_search" }],
@@ -135,7 +135,7 @@ Requirements:
 }
 
 async function createViewAnswers({
-  apiKey,
+  env,
   model,
   question,
   clientContext,
@@ -145,7 +145,7 @@ async function createViewAnswers({
     ? marketContext.summary
     : "No live market context was requested. Do not invent current facts or consensus.";
 
-  const response = await openAI(apiKey, {
+  const response = await openAI(env, {
     model,
     input: [
       {
@@ -205,11 +205,11 @@ Each answer must:
   }
 }
 
-async function openAI(apiKey, payload) {
+async function openAI(env, payload) {
   const response = await fetch(OPENAI_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
