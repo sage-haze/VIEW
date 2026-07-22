@@ -1,50 +1,52 @@
-# Cloudflare Pages OpenAI API key test
+# VIEW Conversation Coach — working Cloudflare Pages version
 
-## Upload to GitHub
+This version restores the full VIEW webpage while keeping the tested Cloudflare
+Pages secret-binding pattern.
 
-Upload the contents of this folder to the root of a GitHub repository. Keep this structure:
+## Repository structure
 
-```
-index.html
-functions/
-  api/
-    test.js
-```
-
-Do not upload your API key to GitHub.
-
-## Connect to Cloudflare Pages
-
-1. Create or open a Cloudflare Pages project connected to the GitHub repository.
-2. Use no framework preset, or select **None**.
-3. Leave the build command blank.
-4. Set the build output directory to `/` if Cloudflare requires one.
-5. Deploy the project.
-
-## Add the secret
-
-In Cloudflare, open:
-
-**Workers & Pages → your Pages project → Settings → Variables and Secrets**
-
-Add an encrypted secret:
-
-- Name: `OPENAI_API_KEY`
-- Value: your OpenAI API key only
-
-Add it to the environment you are testing: Production, Preview, or both.
-Then create a new deployment.
-
-## Test
-
-Open the deployed site and press **Run test**, or visit:
-
-```
-https://YOUR-SITE.pages.dev/api/test
+```text
+/
+├── index.html
+├── app.js
+├── styles.css
+├── _headers
+├── package.json
+└── functions/
+    └── api/
+        ├── health.js
+        ├── test.js
+        └── view.js
 ```
 
-### Result meanings
+## Cloudflare Pages settings
 
-- `stage: "cloudflare-binding"`: Cloudflare did not provide the secret to the Function.
-- `stage: "openai-authentication"`: Cloudflare found the secret, but OpenAI rejected it.
-- `stage: "complete"` and `ok: true`: the key works.
+- Framework preset: None
+- Build command: leave blank
+- Build output directory: `/` or repository root
+- Root directory: leave blank
+
+## Required secret
+
+Add this under the environment you deploy to:
+
+- `OPENAI_API_KEY` — Secret
+
+Then redeploy.
+
+## Optional model variables
+
+You do not need to add these. The built-in defaults are:
+
+- `OPENAI_ANSWER_MODEL=gpt-5-mini`
+- `OPENAI_ANALYSIS_MODEL=gpt-5`
+
+You can add either as a normal variable to override the defaults.
+
+## Test URLs
+
+- `/api/test` makes a small authenticated OpenAI models request.
+- `/api/health` reports whether the binding exists without calling OpenAI.
+- `/` opens the complete VIEW Conversation Coach.
+
+The API key remains server-side and is never returned to the browser.
