@@ -1,85 +1,77 @@
-# VIEW Conversation Coach starter
+# VIEW Coach — Cloudflare Pages edition
 
-This starter provides:
+This repository is designed for one Cloudflare Pages project. The static site
+and server-side API are deployed together.
 
-- A browser form for a client question and optional client context.
-- Three structured answers built around VIEW.
-- An optional current-market-context step using OpenAI web search.
-- A Cloudflare Pages Function that keeps the OpenAI API key server-side.
-
-## Recommended deployment
-
-The simplest setup is to deploy the complete repository as a Cloudflare Pages
-project connected to GitHub. Cloudflare then serves both the static files and
-the `/api/view` Pages Function under the same domain.
-
-Repository layout:
+## Repository structure
 
 ```text
 /
-├── index.html
-├── styles.css
-├── app.js
-└── functions/
-    └── api/
-        └── view.js
+├── public/
+│   ├── index.html
+│   ├── app.js
+│   ├── styles.css
+│   └── _headers
+├── functions/
+│   └── api/
+│       ├── health.js
+│       └── view.js
+└── README.md
 ```
 
-## Cloudflare variables and secrets
+Do not place the whole project inside another folder in the Git repository.
+`public` and `functions` must be visible at the repository root.
 
-Configure:
+## Cloudflare Pages build settings
 
-- `OPENAI_API_KEY` — Secret.
-- `OPENAI_ANALYSIS_MODEL` — Variable, set to `gpt-5.6-terra`.
-- `OPENAI_SIMPLE_MODEL` — Variable, set to the simple model available to your
-  OpenAI project. The code currently defaults to `gpt-5.4-mini`.
+Connect this Git repository to a Cloudflare Pages project and use:
 
-Redeploy after changing bindings.
+- Framework preset: None
+- Build command: leave blank
+- Build output directory: `public`
+- Root directory: leave blank, unless this repository is intentionally inside
+  a monorepo subdirectory
 
-## GitHub Pages plus a separate Cloudflare Worker
+The `/functions` directory must remain at the Pages project root. Do not put it
+inside `public`.
 
-If you retain GitHub Pages for the interface:
+## Runtime variables and secrets
 
-1. Deploy the Function separately as a Worker or Pages project.
-2. Change the URL in `app.js` from `/api/view` to the full Cloudflare endpoint.
-3. Replace `Access-Control-Allow-Origin: *` in `view.js` with the exact GitHub
-   Pages origin, such as `https://example.github.io`.
-4. Add rate limiting and Turnstile before public release.
+Under the Cloudflare Pages project's **Settings → Variables and Secrets**, add:
 
-## About market sentiment and consensus
+- `OPENAI_API_KEY` as a secret
+- `OPENAI_ANALYSIS_MODEL` as a variable with value `gpt-5.6-terra`
 
-The optional research step uses OpenAI's `web_search` tool. It asks the model
-to prefer authoritative sources and distinguish facts from expectations.
+No `.env` file is required for production. The answer model is embedded in
+`functions/api/view.js` as `gpt-5.4-mini`.
 
-For production banking use, web search should not be treated as a formal
-consensus data feed. Better long-term sources include:
+After adding or changing a binding, redeploy the Pages project.
 
-- Your bank's approved house-view research API or document repository.
-- Licensed consensus providers for economist or analyst forecasts.
-- Primary-source central-bank communications and official statistics.
-- Market-implied measures computed from licensed price data.
+## Test the deployment
 
-A strong production pattern is:
+Open:
 
-1. Retrieve approved source material.
-2. Store the source date, publisher, horizon, and exact measure.
-3. Produce a short baseline synthesis.
-4. Pass that synthesis to the VIEW generator.
-5. Display the sources and freshness date to the user.
+```text
+https://YOUR-PROJECT.pages.dev/api/health
+```
 
-## Testing
+Expected response:
 
-Try questions such as:
+```json
+{
+  "ok": true,
+  "runtime": "Cloudflare Pages Functions",
+  "bindings": {
+    "openAIKeyConfigured": true,
+    "analysisModelConfigured": true
+  }
+}
+```
 
-- Do you think interest rates will fall soon?
-- Will the US dollar strengthen further?
-- Is gold likely to remain supported?
-- How might oil prices affect our business this year?
+Then open the project home page and submit a question.
 
-Check that each answer:
+## Important
 
-- Gives a baseline view.
-- Identifies change factors.
-- Explains practical implications.
-- Connects to the client's situation.
-- Avoids unjustified certainty.
+The browser calls `/api/view` using a relative URL. This proves the static site
+and API are being served by the same Cloudflare Pages deployment. No GitHub
+Pages URL, separate Worker URL, or CORS configuration is used.

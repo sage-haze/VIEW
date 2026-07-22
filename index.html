@@ -1,63 +1,48 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VIEW Conversation Coach</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="shell">
-    <header>
-      <p class="eyebrow">VIEW Conversation Coach</p>
-      <h1>Turn a client question into three balanced responses</h1>
-      <p class="intro">
-        Enter a market, economic, or geopolitical question. The coach will create
-        three examples using View, Influences, Effects, and What matters to the client.
-      </p>
+  <main class="container">
+    <header class="panel">
+      <p class="kicker">VIEW Conversation Coach</p>
+      <h1>Create three balanced client responses</h1>
+      <p>Enter a client question. The coach will produce three answers built around View, Influences, Effects, and What matters to the client.</p>
     </header>
 
-    <form id="view-form">
+    <form id="viewForm" class="panel">
       <label for="question">Client question</label>
-      <textarea
-        id="question"
-        name="question"
-        rows="5"
-        maxlength="1500"
-        placeholder="Example: Do you think interest rates will come down soon?"
-        required
-      ></textarea>
+      <textarea id="question" maxlength="1500" required
+        placeholder="Do you think interest rates will fall soon?"></textarea>
 
       <label for="clientContext">Client context <span>(optional)</span></label>
-      <textarea
-        id="clientContext"
-        name="clientContext"
-        rows="3"
-        maxlength="1000"
-        placeholder="Example: The client is considering financing a new factory this year."
-      ></textarea>
+      <textarea id="clientContext" maxlength="1000"
+        placeholder="The client is considering financing a new factory."></textarea>
 
-      <label class="check-row">
-        <input id="useMarketContext" type="checkbox" checked />
+      <label class="checkbox">
+        <input id="useMarketContext" type="checkbox" checked>
         <span>
-          Search for current market sentiment or consensus before drafting
-          <small>Uses the stronger model and may cost more.</small>
+          Use current source-based market context
+          <small>This uses the analysis model and web search.</small>
         </span>
       </label>
 
-      <button id="submitButton" type="submit">Generate VIEW examples</button>
+      <button id="submitButton" type="submit">Generate three responses</button>
     </form>
 
-    <section id="status" class="status" aria-live="polite"></section>
-    <section id="consensus" class="consensus hidden"></section>
-    <section id="results" class="results" aria-live="polite"></section>
+    <p id="status" class="status" aria-live="polite"></p>
+    <section id="marketContext" class="panel hidden"></section>
+    <section id="answers" class="answers" aria-live="polite"></section>
 
     <footer>
-      Do not enter confidential client information. Market information may be incomplete
-      or change quickly and should be verified before use.
+      Do not enter confidential client information. Verify time-sensitive market information before using it with a client.
     </footer>
   </main>
 
-  <script src="./app.js" defer></script>
+  <script src="/app.js" defer></script>
 </body>
 </html>
