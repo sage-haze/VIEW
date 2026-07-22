@@ -1,48 +1,183 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VIEW Conversation Coach</title>
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <main class="container">
-    <header class="panel">
-      <p class="kicker">VIEW Conversation Coach</p>
-      <h1>Create three balanced client responses</h1>
-      <p>Enter a client question. The coach will produce three answers built around View, Influences, Effects, and What matters to the client.</p>
-    </header>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Conversation Bridge</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="page bridge-page">
+      <header class="bridge-hero">
+        <h1>Build Your Bridge</h1>
+        <p class="intro">Convert market signals into commercial client relevance.</p>
+      </header>
 
-    <form id="viewForm" class="panel">
-      <label for="question">Client question</label>
-      <textarea id="question" maxlength="1500" required
-        placeholder="Do you think interest rates will fall soon?"></textarea>
+      <div class="preparation-layout">
+        <main class="preparation-main">
+          <section class="setup-card client-profile-card">
+            <div class="section-heading-row">
+              <div>
+                <h2>Client Profile</h2>
+              </div>
+            </div>
 
-      <label for="clientContext">Client context <span>(optional)</span></label>
-      <textarea id="clientContext" maxlength="1000"
-        placeholder="The client is considering financing a new factory."></textarea>
+            <div class="profile-subsection">
+              <div class="form-grid profile-business-grid">
+                <div class="form-group">
+                  <label for="sector">Sector</label>
+                  <select id="sector">
+                    <option value="">Select a sector</option>
+                  </select>
+                </div>
 
-      <label class="checkbox">
-        <input id="useMarketContext" type="checkbox" checked>
-        <span>
-          Use current source-based market context
-          <small>This uses the analysis model and web search.</small>
-        </span>
-      </label>
+                <div class="form-group">
+                  <label for="subsector">Subsector</label>
+                  <select id="subsector" disabled>
+                    <option value="">Select a sector first</option>
+                  </select>
+                </div>
 
-      <button id="submitButton" type="submit">Generate three responses</button>
-    </form>
+                <div class="form-group isic-picker">
+                  <label for="industry">ISIC activity / industry</label>
+                  <div class="isic-input-wrap">
+                    <input
+                      id="industry"
+                      type="text"
+                      placeholder="e.g., Manufacture of motor vehicles, seafood processing"
+                      autocomplete="off"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      aria-controls="isicDropdown"
+                    >
+                    <div id="isicDropdown" class="isic-dropdown hidden" role="listbox"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-    <p id="status" class="status" aria-live="polite"></p>
-    <section id="marketContext" class="panel hidden"></section>
-    <section id="answers" class="answers" aria-live="polite"></section>
+            <div class="profile-subsection trade-flows-subsection">
+              <div class="trade-flow-grid profile-trade-grid">
+                <section class="trade-side-card" data-side="purchase">
+                  <h3>Purchase from</h3>
+                  <div class="checkbox-row stacked">
+                    <label><input type="checkbox" id="purchaseDomestic" checked> Domestic (Thailand)</label>
+                    <label><input type="checkbox" id="purchaseInternational"> International</label>
+                  </div>
+                  <div class="form-group conditional-field" id="purchaseCountryField">
+                    <label>International purchase markets</label>
+                    <div class="country-picker" data-picker="purchase">
+                      <input id="purchaseCountrySearch" type="text" placeholder="Search supplier countries..." autocomplete="off">
+                      <div id="purchaseCountryDropdown" class="country-dropdown hidden"></div>
+                    </div>
+                    <div id="selectedPurchaseCountries" class="selected-country-row"></div>
+                  </div>
+                  <div class="form-group">
+                    <label>Purchase currencies</label>
+                    <div class="checkbox-row stacked compact-currencies">
+                      <label><input type="checkbox" name="purchaseCurrency" value="THB" checked> THB</label>
+                      <label><input type="checkbox" name="purchaseCurrency" value="USD"> USD</label>
+                      <label><input type="checkbox" name="purchaseCurrency" value="JPY"> JPY</label>
+                      <label><input type="checkbox" name="purchaseCurrency" value="EUR"> EUR</label>
+                      <label><input type="checkbox" name="purchaseCurrency" value="CNY"> CNY</label>
+                    </div>
+                  </div>
+                </section>
 
-    <footer>
-      Do not enter confidential client information. Verify time-sensitive market information before using it with a client.
-    </footer>
-  </main>
+                <section class="trade-side-card" data-side="sales">
+                  <h3>Sales to</h3>
+                  <div class="checkbox-row stacked">
+                    <label><input type="checkbox" id="salesDomestic" checked> Domestic (Thailand)</label>
+                    <label><input type="checkbox" id="salesInternational"> International</label>
+                  </div>
+                  <div class="form-group conditional-field" id="salesCountryField">
+                    <label>International sales markets</label>
+                    <div class="country-picker" data-picker="sales">
+                      <input id="salesCountrySearch" type="text" placeholder="Search customer countries..." autocomplete="off">
+                      <div id="salesCountryDropdown" class="country-dropdown hidden"></div>
+                    </div>
+                    <div id="selectedSalesCountries" class="selected-country-row"></div>
+                  </div>
+                  <div class="form-group">
+                    <label>Sales currencies</label>
+                    <div class="checkbox-row stacked compact-currencies">
+                      <label><input type="checkbox" name="salesCurrency" value="THB" checked> THB</label>
+                      <label><input type="checkbox" name="salesCurrency" value="USD"> USD</label>
+                      <label><input type="checkbox" name="salesCurrency" value="JPY"> JPY</label>
+                      <label><input type="checkbox" name="salesCurrency" value="EUR"> EUR</label>
+                      <label><input type="checkbox" name="salesCurrency" value="CNY"> CNY</label>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
 
-  <script src="/app.js" defer></script>
-</body>
+          <input id="timeframe" type="hidden" value="60">
+
+          <div class="form-group developer-focus hidden">
+            <label for="defaultPrompt">Custom Focus (Optional)</label>
+            <textarea id="defaultPrompt" rows="3">Focus on trade finance implications relevant to this client’s directional trade flows. Separate purchase-side cost/supplier risks from sales-side revenue/demand risks, including supply chain dynamics, FX exposure, working capital needs, payment and counterparty risk, documentary trade, guarantees, and opportunities for trade finance solutions. Prioritise practical insights for a Thailand-based client.</textarea>
+          </div>
+
+          <div class="action-row primary-action-row">
+            <button id="send" type="button">Generate Relevant Signals</button>
+          </div>
+        </main>
+
+        <aside class="setup-card five-moves-card five-moves-sidebar" aria-label="A simple conversation flow">
+          <div class="section-heading-row">
+            <div>
+              <h2>A CLEAR Conversation Flow</h2>
+            </div>
+          </div>
+          <ol class="five-moves-list clear-moves-list">
+            <li data-letter="C"><strong>Comment on context</strong><span>Begin with a simple observation</span></li>
+            <li data-letter="L"><strong>Link to client</strong><span>Relate it gently to the client’s business</span></li>
+            <li data-letter="E"><strong>Explore lightly</strong><span>Invite the client to share their perspective</span></li>
+            <li data-letter="A"><strong>Allow room</strong><span>Listen to what feels relevant to them</span></li>
+            <li data-letter="R"><strong>Reaffirm support</strong><span>Reflect and offer a helpful next step</span></li>
+          </ol>
+        </aside>
+      </div>
+
+      <section class="outputs-layout">
+        <div class="result-card signals-panel">
+          <div class="result-card-header">
+            <h2>Client Signals</h2>
+          </div>
+          <div id="analysisOutput">Relevant signals will appear here.</div>
+        </div>
+
+        <div class="result-card intelligence-panel">
+          <div class="result-card-header">
+            <h2>Market Intelligence</h2>
+          </div>
+          <div id="fxOutput">Market rates will appear here.</div>
+        </div>
+      </section>
+
+      <section class="result-card bridge-panel hidden" id="bridgePanel">
+        <div class="result-card-header">
+          <h2>Client Conversation</h2>
+        </div>
+        <div id="bridgeOutput"></div>
+      </section>
+
+
+      <!-- DEACTIVATED 2026-05: kept for future reference.
+      <div class="result-card">
+        <h2>Industry Context &amp; RM Considerations</h2>
+        <div id="contextOutput">Industry-specific context and RM considerations will appear here.</div>
+      </div>
+      -->
+    </div>
+
+    <script src="sector-data.js"></script>
+    <script src="country-data.js"></script>
+    <script src="isic-data.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+  </body>
 </html>
