@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenAI Key Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 60px auto; padding: 0 20px; }
+    button { padding: 12px 18px; font-size: 16px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 8px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Cloudflare OpenAI API Key Test</h1>
+  <p>This checks whether the Pages Function can read <code>OPENAI_API_KEY</code> and whether OpenAI accepts it.</p>
+  <button id="test">Run test</button>
+  <pre id="result">Press “Run test”.</pre>
+
+  <script>
+    const button = document.getElementById('test');
+    const result = document.getElementById('result');
+
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      result.textContent = 'Testing…';
+
+      try {
+        const response = await fetch('/api/test');
+        const data = await response.json();
+        result.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        result.textContent = JSON.stringify({ ok: false, error: String(error) }, null, 2);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
