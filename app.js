@@ -38,6 +38,9 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      if (data.diagnostics) {
+        console.error("VIEW API diagnostics", data.diagnostics);
+      }
       throw new Error(data.error || `Request failed (${response.status}).`);
     }
 

@@ -1,6 +1,6 @@
 const OPENAI_URL = "https://api.openai.com/v1/responses";
-const DEFAULT_ANSWER_MODEL = "gpt-5-mini";
-const DEFAULT_ANALYSIS_MODEL = "gpt-5";
+const DEFAULT_ANSWER_MODEL = "gpt-5.6-terra";
+const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
 
 const OUTPUT_SCHEMA = {
   type: "object",
@@ -84,7 +84,8 @@ export async function onRequestPost(context) {
 
     return json(
       {
-        error: error.publicMessage || error.message || "Unable to generate responses."
+        error: error.publicMessage || error.message || "Unable to generate responses.",
+        diagnostics: error.diagnostics || null
       },
       error.status || 500
     );
@@ -94,7 +95,7 @@ export async function onRequestPost(context) {
 async function createMarketContext({ env, model, question, clientContext }) {
   const response = await openAI(env, {
     model,
-    reasoning: { effort: "medium" },
+    reasoning: { effort: "low" },
     tools: [{ type: "web_search" }],
     include: ["web_search_call.action.sources"],
     input: [
@@ -123,7 +124,7 @@ Requirements:
 - Do not give personalised investment advice.`
       }
     ],
-    max_output_tokens: 700,
+    max_output_tokens: 3000,
     store: false
   });
 
@@ -148,6 +149,9 @@ async function createViewAnswers({
 
   const response = await openAI(env, {
     model,
+    // This is a constrained writing task, so avoid spending most of the
+    // output budget on hidden reasoning before producing the JSON result.
+    reasoning: { effort: "none" },
     input: [
       {
         role: "system",
@@ -189,6 +193,7 @@ Each answer must:
       }
     ],
     text: {
+      verbosity: "medium",
       format: {
         type: "json_schema",
         name: "view_answers",
@@ -196,14 +201,22 @@ Each answer must:
         schema: OUTPUT_SCHEMA
       }
     },
-    max_output_tokens: 1800,
+    max_output_tokens: 6000,
     store: false
   });
 
+  const text = outputText(response);
+
   try {
-    return JSON.parse(outputText(response));
+    return JSON.parse(text);
   } catch {
-    throw new Error("The model returned an invalid structured response.");
+    const error = new Error("The model returned text, but it was not valid structured JSON.");
+    error.diagnostics = {
+      requestId: response._requestId || null,
+      status: response.status || null,
+      outputPreview: text.slice(0, 240)
+    };
+    throw error;
   }
 }
 
@@ -218,15 +231,25 @@ async function openAI(env, payload) {
   });
 
   const data = await response.json().catch(() => ({}));
+  const requestId = response.headers.get("x-request-id");
 
   if (!response.ok) {
     const error = new Error(
       data?.error?.message || `OpenAI request failed with status ${response.status}.`
     );
     error.status = response.status;
+    error.diagnostics = {
+      requestId,
+      status: response.status,
+      type: data?.error?.type || null,
+      code: data?.error?.code || null
+    };
     throw error;
   }
 
+  // The raw REST response does not provide the SDK's output_text helper, so
+  // outputText() walks the output array. Preserve the request ID for diagnostics.
+  data._requestId = requestId;
   return data;
 }
 
@@ -236,15 +259,62 @@ function outputText(response) {
   }
 
   const parts = [];
+  const refusals = [];
+
   for (const item of response.output || []) {
     if (item.type !== "message") continue;
+
     for (const content of item.content || []) {
-      if (content.type === "output_text" && content.text) parts.push(content.text);
+      if (content.type === "output_text" && content.text) {
+        parts.push(content.text);
+      }
+
+      if (content.type === "refusal" && content.refusal) {
+        refusals.push(content.refusal);
+      }
     }
   }
 
-  if (!parts.length) throw new Error("OpenAI returned no text.");
-  return parts.join("\n").trim();
+  if (parts.length) return parts.join("\n").trim();
+
+  const outputTypes = (response.output || []).map((item) => item.type);
+  const incompleteReason = response.incomplete_details?.reason || null;
+  const requestId = response._requestId || null;
+
+  if (refusals.length) {
+    const error = new Error(`OpenAI refused the request: ${refusals.join(" ")}`);
+    error.diagnostics = { status: response.status, outputTypes, requestId };
+    throw error;
+  }
+
+  if (response.status === "incomplete" && incompleteReason === "max_output_tokens") {
+    const error = new Error(
+      "OpenAI used the output-token budget before producing the final text. " +
+      "The request now uses a larger budget and lower reasoning effort; redeploy and try again."
+    );
+    error.diagnostics = {
+      status: response.status,
+      incompleteReason,
+      outputTypes,
+      requestId,
+      usage: response.usage || null
+    };
+    throw error;
+  }
+
+  const error = new Error(
+    `OpenAI returned no text (status: ${response.status || "unknown"}; ` +
+    `output types: ${outputTypes.join(", ") || "none"}).` +
+    (requestId ? ` Request ID: ${requestId}.` : "")
+  );
+  error.diagnostics = {
+    status: response.status || null,
+    incompleteReason,
+    outputTypes,
+    requestId,
+    usage: response.usage || null
+  };
+  throw error;
 }
 
 function extractSources(response) {

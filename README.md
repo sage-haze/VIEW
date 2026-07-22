@@ -38,8 +38,8 @@ Then redeploy.
 
 You do not need to add these. The built-in defaults are:
 
-- `OPENAI_ANSWER_MODEL=gpt-5-mini`
-- `OPENAI_ANALYSIS_MODEL=gpt-5`
+- `OPENAI_ANSWER_MODEL=gpt-5.6-terra`
+- `OPENAI_ANALYSIS_MODEL=gpt-5.4-mini`
 
 You can add either as a normal variable to override the defaults.
 
@@ -50,3 +50,10 @@ You can add either as a normal variable to override the defaults.
 - `/` opens the complete VIEW Conversation Coach.
 
 The API key remains server-side and is never returned to the browser.
+
+
+## Fix for “OpenAI returned no text”
+
+This revision explicitly uses low/no reasoning for these short generation tasks,
+increases the output-token budgets, and reports the Responses API status, output
+item types, incomplete reason, and OpenAI request ID when no text is returned.
