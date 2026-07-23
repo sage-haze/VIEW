@@ -207,8 +207,8 @@ async function createViewAnswers({
 VIEW means:
 V — Give a clear but appropriately cautious baseline view.
 I — Identify the main influences that could change the view.
-E — Explain the practical implication for the client's decision; do not merely repeat the forecast.
-W — Connect the discussion to what matters to the client with one direct, topic-specific question.
+E — Explain the potential practical implication for the client's decision; do not merely repeat the forecast.
+W — Connect the discussion to what matters to the client with a bridging sentence to introduce the link, followed by one direct, topic-specific question.
 
 Write for a banker speaking naturally to a client. Prefer short, clear sentences and ordinary spoken language. Avoid academic wording, market-note language, jargon, product pitching and internal process language. Never pretend to predict with certainty. Do not recommend a transaction before the client's objective and constraints are understood.`
       },
@@ -251,7 +251,7 @@ Requirements for every answer:
 - If the question uses an imprecise timeframe such as “soon”, briefly define a sensible horizon, for example “over the next few months”.
 - Do not silently assume a country, currency or central bank. Use the supplied market/region or state the necessary market assumption naturally in a few words.
 - The responseBody must contain no questions and no question marks.
-- The clientQuestion must be exactly one short, direct question ending in a question mark.
+- The clientQuestion must be exactly one short, question ending in a question mark to invite the client to share more.
 - Each clientQuestion must be distinct, specific to the topic and useful for a real follow-up conversation.
 - Do not use the generic phrase “What decision is behind your question?”
 - Do not repeat the same wording or sentence structure across the three answers.
