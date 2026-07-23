@@ -6,7 +6,7 @@ This folder is a complete Cloudflare Pages project. Upload **the contents of thi
 
 - Refactors the answer prompt to remove repeated and overly prescriptive instructions.
 - Generates three genuinely different banker perspectives:
-  1. Relationship-led banker
+  1. Friendly relationship builder
   2. Commercial planning partner
   3. Risk-aware specialist
 - Uses structured JSON output for the market brief and the three responses.

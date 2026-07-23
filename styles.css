@@ -134,13 +134,6 @@ button:disabled { opacity: .65; cursor: progress; }
 .view-part strong { display: block; margin-bottom: 4px; }
 .view-part p { margin: 0; }
 
-.copy-button {
-  margin-top: 12px;
-  border: 1px solid #c7d0df;
-  background: white;
-  color: #243f9d;
-  padding: 9px 13px;
-}
 
 .section-heading {
   display: flex;
@@ -212,16 +205,7 @@ footer { color: #657086; font-size: .85rem; padding: 18px 4px; }
 }
 
 
-.answer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0.8rem 0 1rem;
-}
 
-.copy-button.secondary {
-  background: transparent;
-}
 
 .coach-details {
   margin-top: 1rem;

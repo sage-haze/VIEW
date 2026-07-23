@@ -5,9 +5,9 @@ const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
 const PERSONAS = [
   {
     id: "relationship",
-    label: "Relationship-led banker",
+    label: "Friendly relationship builder",
     guidance:
-      "Give a simple, credible initial perspective using only the market detail needed to be useful. Bridge warmly to the client's situation and end with a broad, genuinely curious question about why the issue matters to them. Do not turn the question into an exposure checklist."
+      "Respond like a thoughtful junior banker who is building trust over time. Give a simple and useful initial perspective without trying to sound like the expert in the room. Use warm, natural language, acknowledge that the client may see the issue differently, and end with one broad, genuinely curious question. Do not turn the question into an exposure checklist."
   },
   {
     id: "commercial",
@@ -214,7 +214,7 @@ async function createViewAnswers({
     input: [
       {
         role: "system",
-        content: `You are VIEW Coach. Help a junior banker respond as a reliable partner: calm, commercially aware, useful and genuinely interested in the client.
+        content: `You are VIEW Coach. Help a junior banker build a friendly, trusted client relationship. The banker should sound prepared and thoughtful, but not overly authoritative or eager to prove expertise. They should offer something useful first, speak with humility and warmth, and show genuine interest in how the issue affects the client.
 
 Use VIEW as a reasoning structure, not a spoken script:
 - V — Give a clear baseline view.
@@ -226,7 +226,7 @@ Important conversational principle: answer before asking. Do not begin with a cl
 
 The final question should be open enough to reveal something unexpected and specific enough to answer. It may offer two or three plausible examples, but must leave space for “something else”, “another priority” or “a different angle”. Avoid binary, product-led or prematurely narrow questions.
 
-Use ordinary spoken English and relatively short sentences. Avoid academic language, market-note phrasing, jargon, false certainty, excessive disclaimers and product pitching. Do not recommend a transaction until the client's objective and constraints are understood. Do not invent facts, forecasts, institutional views or current market data.`
+Use ordinary spoken English and relatively short sentences. The response should feel natural for a junior banker speaking with a client: friendly, respectful, helpful and quietly confident. Avoid academic language, market-note phrasing, jargon, false certainty, excessive disclaimers, product pitching and language that sounds like a senior strategist or official house view. Do not recommend a transaction until the client's objective and constraints are understood. Do not invent facts, forecasts, institutional views or current market data.`
       },
       {
         role: "user",
@@ -287,7 +287,7 @@ function normaliseAnswers(answers, question, clientContext) {
 
   return PERSONAS.map((persona, index) => {
     const answer = byId.get(persona.id) || answers[index] || {};
-    const body = cleanSpeech(answer.responseBody);
+    const body = cleanSpeech(removeQuestions(answer.responseBody));
     let clientQuestion = normaliseClientQuestion(answer.clientQuestion);
 
     if (
@@ -305,7 +305,7 @@ function normaliseAnswers(answers, question, clientContext) {
       label: persona.label,
       response: assembleResponse(body, clientQuestion),
       shorterLiveVersion: assembleResponse(
-        cleanSpeech(answer.shorterLiveBody),
+        cleanSpeech(removeQuestions(answer.shorterLiveBody)),
         clientQuestion
       ),
       view: cleanSpeech(answer.view),
@@ -319,30 +319,24 @@ function normaliseAnswers(answers, question, clientContext) {
 }
 
 function assembleResponse(body, clientQuestion) {
-  const cleanBody = cleanSpeech(stripTrailingQuestion(body));
+  const cleanBody = cleanSpeech(removeQuestions(body));
   if (!cleanBody) return clientQuestion;
 
   const punctuation = /[.!]$/.test(cleanBody) ? "" : ".";
   return `${cleanBody}${punctuation} ${clientQuestion}`.replace(/\s+/g, " ").trim();
 }
 
-function stripTrailingQuestion(value) {
+function removeQuestions(value) {
   const text = clean(value, 1800).trim();
   if (!text) return "";
 
-  // Structured output should not contain a question here. If the model adds
-  // one anyway, remove the final question before appending clientQuestion once.
-  if (!text.endsWith("?")) return text;
-
-  const sentenceBoundary = Math.max(
-    text.lastIndexOf(". "),
-    text.lastIndexOf("! "),
-    text.lastIndexOf("? ", text.length - 2)
-  );
-
-  return sentenceBoundary >= 0
-    ? text.slice(0, sentenceBoundary + 1).trim()
-    : "";
+  // responseBody and shorterLiveBody must not contain questions. If the model
+  // adds one despite the schema instructions, keep only the useful statement
+  // before the first question and append clientQuestion once in code.
+  const firstQuestion = text.indexOf("?");
+  return (firstQuestion >= 0 ? text.slice(0, firstQuestion) : text)
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function topicSpecificFallbacks(question, clientContext) {
@@ -417,24 +411,27 @@ function parseJsonOutput(response, description) {
 }
 
 function sanitiseMarketProse(value) {
-  return clean(value, 2200)
-    // Remove markdown-style links, including spaces between ] and (.
-    .replace(/\[([^\]]+)\]\s*\(\s*https?:\/\/[^)]+\)/gi, "")
-    // Remove combined citation clusters such as ([publisher.com] (https://...)).
-    .replace(/\(\s*\[[^\]]+\]\s*\(\s*https?:\/\/[^)]+\)\s*\)/gi, "")
-    // Remove parenthesised and bare URLs that still remain.
-    .replace(/\(\s*https?:\/\/[^)]+\)/gi, "")
-    .replace(/https?:\/\/[^\s)]+/gi, "")
-    // Remove leaked publisher/domain markers and simple footnote markers.
-    .replace(/\[\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\]/gi, "")
-    .replace(/\(\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\)/gi, "")
+  let text = clean(value, 2200).trim();
+  if (!text) return "";
+
+  // Web-search citations occasionally leak into structured fields as nested
+  // markdown such as ([publisher.com] (https://...)). In these compact fields,
+  // citations are appended after the prose, so discard everything from the
+  // first URL onward and then remove any citation prefix left behind.
+  const urlIndex = text.search(/https?:\/\//i);
+  if (urlIndex >= 0) text = text.slice(0, urlIndex);
+
+  return text
+    .replace(/\s*\(\s*\[[^\]]+\]\s*\(?\s*$/g, "")
+    .replace(/\[[^\]]+\]\s*$/g, "")
+    .replace(/\(\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\)*/gi, "")
     .replace(/\[\s*(?:source|sources|citation|\d+)\s*\]/gi, "")
-    // Tidy punctuation left behind by removed citations.
     .replace(/\(\s*\)/g, "")
     .replace(/\[\s*\]/g, "")
     .replace(/\s+([,.;:!?])/g, "$1")
     .replace(/([.!?])\1+/g, "$1")
     .replace(/\s+/g, " ")
+    .replace(/[([\s]+$/, "")
     .trim();
 }
 

@@ -133,14 +133,6 @@ function renderAnswers(answers) {
         <h2>${escapeHtml(answer.label || `Response ${index + 1}`)}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
-      <div class="answer-actions">
-        <button class="copy-button" type="button" data-copy="${escapeAttribute(answer.response)}">
-          Copy full response
-        </button>
-        <button class="copy-button secondary" type="button" data-copy="${escapeAttribute(answer.shorterLiveVersion || answer.response)}">
-          Copy shorter live version
-        </button>
-      </div>
       <div class="view-grid">
         ${viewPart("V — Baseline view", answer.view)}
         ${viewPart("I — What may change it", answer.influences)}
@@ -157,26 +149,8 @@ function renderAnswers(answers) {
       </details>
     </article>
   `).join("");
-
-  answersBox.querySelectorAll(".copy-button").forEach((button) => {
-    button.addEventListener("click", () => copyResponse(button));
-  });
 }
 
-async function copyResponse(button) {
-  const original = button.textContent;
-
-  try {
-    await navigator.clipboard.writeText(button.dataset.copy || "");
-    button.textContent = "Copied";
-  } catch {
-    button.textContent = "Copy failed";
-  }
-
-  window.setTimeout(() => {
-    button.textContent = original;
-  }, 1500);
-}
 
 function viewPart(title, text) {
   return `<div class="view-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text || "")}</p></div>`;
