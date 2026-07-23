@@ -18,8 +18,8 @@ form.addEventListener("submit", async (event) => {
   setLoading(true);
 
   statusBox.textContent = marketToggle.checked
-    ? "Checking current context and preparing three banker perspectives…"
-    : "Preparing three banker perspectives…";
+    ? "Checking current context and preparing a suggested response…"
+    : "Preparing a suggested response…";
 
   try {
     const response = await fetch("/api/view", {
@@ -41,7 +41,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     renderMarketContext(data.marketContext);
-    renderAnswers(data.answers);
+    renderAnswer(data.answer);
     statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
     answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -62,7 +62,7 @@ function resetOutput() {
 
 function setLoading(loading) {
   submitButton.disabled = loading;
-  submitButton.textContent = loading ? "Generating…" : "Generate three banker perspectives";
+  submitButton.textContent = loading ? "Generating…" : "Generate suggested response";
   form.setAttribute("aria-busy", String(loading));
 }
 
@@ -121,23 +121,23 @@ function contextPart(title, text) {
     : "";
 }
 
-function renderAnswers(answers) {
-  if (!Array.isArray(answers) || answers.length !== 3) {
-    throw new Error("The API did not return three valid responses.");
+function renderAnswer(answer) {
+  if (!answer?.response) {
+    throw new Error("The API did not return a valid response.");
   }
 
-  answersBox.innerHTML = answers.map((answer, index) => `
+  answersBox.innerHTML = `
     <article class="panel answer">
       <div class="answer-heading">
-        <span class="answer-number">${index + 1}</span>
-        <h2>${escapeHtml(answer.label || `Response ${index + 1}`)}</h2>
+        <span class="answer-number">1</span>
+        <h2>${escapeHtml(answer.label || "Suggested response")}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
       <div class="view-grid">
         ${viewPart("V — Baseline view", answer.view)}
         ${viewPart("I — What may change it", answer.influences)}
-        ${viewPart("E — Possible implications", answer.effects)}
-        ${viewPart("W — Bridge and client question", answer.whatMatters)}
+        ${viewPart("E — Why it may matter", answer.effects)}
+        ${viewPart("W — Friendly follow-up", answer.whatMatters)}
       </div>
       <details class="coach-details">
         <summary>Coaching notes and shorter version</summary>
@@ -148,9 +148,8 @@ function renderAnswers(answers) {
         </div>
       </details>
     </article>
-  `).join("");
+  `;
 }
-
 
 function viewPart(title, text) {
   return `<div class="view-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text || "")}</p></div>`;

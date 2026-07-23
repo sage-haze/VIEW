@@ -72,3 +72,13 @@ This version also:
 - generates response bodies and final client questions separately, then joins them once to prevent duplicated questions;
 - shortens the market brief for improved card readability;
 - sharpens the distinction between relationship-led, commercial-planning and risk-aware responses.
+
+
+## Conversational relevance calibration
+
+The response prompt does not assume every client question is connected to a business need. It treats the question as potentially light conversation or general curiosity, uses conditional language for possible commercial relevance, and gives the client room to say whether there is a specific angle behind the question.
+
+
+## v5 response style
+
+This version generates one friendly response for a junior banker with roughly one to two years of experience. It takes the client question at face value, avoids assuming a commercial need or market position, uses plain English, and avoids language that could sound corrective.

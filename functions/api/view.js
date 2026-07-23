@@ -2,64 +2,34 @@ const OPENAI_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_ANSWER_MODEL = "gpt-5.6-terra";
 const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
 
-const PERSONAS = [
-  {
-    id: "relationship",
-    label: "Friendly relationship builder",
-    guidance:
-      "Respond like a thoughtful junior banker who is building trust over time. Give a simple and useful initial perspective without trying to sound like the expert in the room. Use warm, natural language, acknowledge that the client may see the issue differently, and end with one broad, genuinely curious question. Do not turn the question into an exposure checklist."
-  },
-  {
-    id: "commercial",
-    label: "Commercial planning partner",
-    guidance:
-      "Translate the outlook into one or two concrete planning considerations such as timing, costs, cash flow, liquidity, procurement or operational flexibility. End by exploring the decision or planning horizon affected. Avoid sounding like a formal strategy paper."
-  },
-  {
-    id: "risk",
-    label: "Risk-aware specialist",
-    guidance:
-      "State the base case, then identify the most important trigger that would make the outcome materially better or worse. Connect this to the client's decision date, resilience or tolerance for adverse movement. Use plain language and avoid listing every possible risk."
-  }
-];
+const BANKER_PROFILE = {
+  id: "friendly_junior",
+  label: "Suggested response"
+};
 
 const VIEW_ANSWER_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    answers: {
-      type: "array",
-      minItems: PERSONAS.length,
-      maxItems: PERSONAS.length,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          personaId: { type: "string", enum: PERSONAS.map(({ id }) => id) },
-          responseBody: { type: "string" },
-          shorterLiveBody: { type: "string" },
-          view: { type: "string" },
-          influences: { type: "string" },
-          effects: { type: "string" },
-          clientQuestion: { type: "string" },
-          assumptionsMade: { type: "string" },
-          verificationNeeded: { type: "string" }
-        },
-        required: [
-          "personaId",
-          "responseBody",
-          "shorterLiveBody",
-          "view",
-          "influences",
-          "effects",
-          "clientQuestion",
-          "assumptionsMade",
-          "verificationNeeded"
-        ]
-      }
-    }
+    responseBody: { type: "string" },
+    shorterLiveBody: { type: "string" },
+    view: { type: "string" },
+    influences: { type: "string" },
+    effects: { type: "string" },
+    clientQuestion: { type: "string" },
+    assumptionsMade: { type: "string" },
+    verificationNeeded: { type: "string" }
   },
-  required: ["answers"]
+  required: [
+    "responseBody",
+    "shorterLiveBody",
+    "view",
+    "influences",
+    "effects",
+    "clientQuestion",
+    "assumptionsMade",
+    "verificationNeeded"
+  ]
 };
 
 const MARKET_CONTEXT_SCHEMA = {
@@ -103,7 +73,7 @@ export async function onRequestPost({ request, env }) {
       ? await createMarketContext({ env, model: analysisModel, ...input })
       : null;
 
-    const answers = await createViewAnswers({
+    const answer = await createViewAnswer({
       env,
       model: answerModel,
       marketContext,
@@ -111,7 +81,7 @@ export async function onRequestPost({ request, env }) {
     });
 
     return json({
-      answers,
+      answer,
       marketContext,
       models: {
         answer: answerModel,
@@ -191,7 +161,7 @@ Check the direction of causal claims and describe opposing forces separately.`
   };
 }
 
-async function createViewAnswers({
+async function createViewAnswer({
   env,
   model,
   question,
@@ -203,30 +173,35 @@ async function createViewAnswers({
     ? JSON.stringify(pick(marketContext, ["assumption", "baseline", "observed", "watch", "asOf"]))
     : "No live context was requested. Do not invent current facts, figures or market consensus.";
 
-  const personaInstructions = PERSONAS.map(
-    ({ id, label, guidance }, index) =>
-      `${index + 1}. ${label} (${id}): ${guidance}`
-  ).join("\n");
-
   const response = await openAI(env, {
     model,
     reasoning: { effort: "none" },
     input: [
       {
         role: "system",
-        content: `You are VIEW Coach. Help a junior banker build a friendly, trusted client relationship. The banker should sound prepared and thoughtful, but not overly authoritative or eager to prove expertise. They should offer something useful first, speak with humility and warmth, and show genuine interest in how the issue affects the client.
+        content: `You are helping a friendly junior banker with about one to two years of experience respond to a client.
 
-Use VIEW as a reasoning structure, not a spoken script:
-- V — Give a clear baseline view.
-- I — Identify only the one or two factors most likely to change it.
-- E — Translate the view into relevant business or financial implications.
-- W — Bridge from the broad picture to the client's situation, then ask one open and helpful question.
+The banker is building rapport, not trying to sound like a market expert. The client may be making light conversation, sharing something they heard, or inviting a general exchange. Take the question at face value. Do not assume the client has a market position, a business exposure, a financial concern, a decision to make, or a particular base-case view.
 
-Important conversational principle: answer before asking. Do not begin with a clarifying question. Where the client's question is broad, use the most reasonable interpretation, state any material assumption lightly, provide a useful broad response, and only then invite the client to explain what matters most.
+Use VIEW as an internal guide:
+- V: Give a simple and direct initial view in everyday language.
+- I: Mention one important thing that could change the picture.
+- E: Explain why the topic may be interesting or relevant, without manufacturing a business implication.
+- W: End with one friendly, open question that stays close to what the client actually asked.
 
-The final question should be open enough to reveal something unexpected and specific enough to answer. It may offer two or three plausible examples, but must leave space for “something else”, “another priority” or “a different angle”. Avoid binary, product-led or prematurely narrow questions.
-
-Use ordinary spoken English and relatively short sentences. The response should feel natural for a junior banker speaking with a client: friendly, respectful, helpful and quietly confident. Avoid academic language, market-note phrasing, jargon, false certainty, excessive disclaimers, product pitching and language that sounds like a senior strategist or official house view. Do not recommend a transaction until the client's objective and constraints are understood. Do not invent facts, forecasts, institutional views or current market data.`
+Conversation rules:
+- Answer before asking a question.
+- Use plain English that does not require financial-market knowledge.
+- Explain any necessary market term in ordinary words.
+- Do not correct, challenge or reframe the client’s premise.
+- Do not imply that the client is wrong, overconfident, relying on a false floor, chasing a market move, or overlooking risk.
+- Do not tell the client what they should do.
+- Do not introduce hedging, exposure, risk tolerance, timing, liquidity or transactions unless the client context explicitly makes them relevant.
+- Do not force a commercial angle. It is acceptable for the response to remain a friendly exchange about the topic.
+- Avoid phrases such as “your base case”, “you may be assuming”, “rather than treating”, “you should allow for”, “the prudent approach”, or anything that sounds corrective or advisory.
+- Do not sound like a strategist, economist, research note or official house view.
+- Keep the tone warm, modest, natural and easy to say aloud.
+- Do not invent facts, forecasts, figures or institutional views.`
       },
       {
         role: "user",
@@ -239,89 +214,68 @@ Use ordinary spoken English and relatively short sentences. The response should 
 SOURCE-BASED CONTEXT:
 ${context}
 
-Create exactly one answer for each banker persona, in this order:
-${personaInstructions}
+Create one suggested response for the junior banker.
 
-For each persona:
-- responseBody: 90–130 words containing the baseline view, main uncertainty, practical implications and a natural bridge. Do not include the final client question.
-- shorterLiveBody: 35–60 words containing the baseline, main uncertainty, one implication and a short bridge. Do not include the final client question.
-- view: a brief explanation of the baseline view.
-- influences: the one or two factors most likely to change the view.
-- effects: practical implications relevant to the likely client decision.
-- clientQuestion: one open, topic-specific question ending in a question mark. Include helpful examples where useful and preserve an explicit opening for another concern or angle.
-- assumptionsMade: state the reasonable interpretation used, or “None”.
-- verificationNeeded: identify current facts, technical details or specialist input to check, or “None”.
+Output requirements:
+- responseBody: 70–110 words. Give a simple answer, one main uncertainty, and a natural bridge. Do not include the final question.
+- shorterLiveBody: 35–55 words. Keep the same friendly, accessible tone. Do not include the final question.
+- view: a brief plain-English summary of the initial view.
+- influences: the single most important factor that could change the picture, in plain English.
+- effects: why the topic may matter or be interesting. Do not assume a business or financial need.
+- clientQuestion: one friendly, topic-specific question ending in a question mark. Prefer questions such as “What have you been hearing about it?” or “What made you ask?” adapted naturally to the topic. Do not ask about exposure, decisions, risks or transactions unless supplied context clearly points there.
+- assumptionsMade: state any material interpretation used, or “None”.
+- verificationNeeded: identify current facts that should be checked, or “None”.
 
-Shared quality requirements:
-- Do not start responseBody or shorterLiveBody with a question.
-- Do not place any question in responseBody or shorterLiveBody; clientQuestion is the single final question and the application will append it once.
-- Do not bury the baseline beneath caveats.
-- Mention only material uncertainties; do not list every scenario.
-- State a material assumption lightly in the response only when necessary.
-- Keep implications practical and relevant; do not jump to a product recommendation.
-- The bridge into W should acknowledge that relevance depends on the client's priorities or exposures.
-- Do not silently assume a market, currency, country or central bank.
-- Do not mention VIEW, the model, the prompt, the source brief or the analysis.
-- Do not include markdown, citations, URLs or unsupported figures.
-- The three answers must differ in banker purpose and emphasis, not merely in confidence, wording or length.
-- Each persona may emphasise different parts of the shared analysis; do not force every answer to repeat every fact, risk and implication.
-- The short VIEW fields should explain the structure rather than repeat the response verbatim.`
+Quality checks:
+- Take the client’s wording at face value.
+- Do not infer or comment on the client’s own view.
+- Do not use language that sounds like correcting the client.
+- Do not start with a disclaimer or a question.
+- Do not use jargon where a common word will do.
+- Do not mention VIEW, the prompt, the model or the source brief.
+- Do not include markdown, citations, publisher names or URLs.`
       }
     ],
     text: {
       verbosity: "medium",
-      ...jsonFormat("view_answers", VIEW_ANSWER_SCHEMA)
+      ...jsonFormat("view_answer", VIEW_ANSWER_SCHEMA)
     },
-    max_output_tokens: 4200,
+    max_output_tokens: 1800,
     store: false
   });
 
-  const parsed = parseJsonOutput(response, "VIEW answers");
-  return normaliseAnswers(parsed.answers, question, clientContext);
+  const parsed = parseJsonOutput(response, "VIEW answer");
+  return normaliseAnswer(parsed, question, clientContext);
 }
 
-function normaliseAnswers(answers, question, clientContext) {
-  const byId = new Map(answers.map((answer) => [answer.personaId, answer]));
-  const fallbacks = topicSpecificFallbacks(question, clientContext);
-  const usedQuestions = new Set();
+function normaliseAnswer(answer, question, clientContext) {
+  const body = cleanSpeech(removeQuestions(answer.responseBody));
+  let clientQuestion = normaliseClientQuestion(answer.clientQuestion);
 
-  return PERSONAS.map((persona, index) => {
-    const answer = byId.get(persona.id) || answers[index] || {};
-    const body = cleanSpeech(removeQuestions(answer.responseBody));
-    let clientQuestion = normaliseClientQuestion(answer.clientQuestion);
+  if (!clientQuestion || isGenericClientQuestion(clientQuestion)) {
+    clientQuestion = topicSpecificFallback(question, clientContext);
+  }
 
-    if (
-      !clientQuestion ||
-      isGenericClientQuestion(clientQuestion) ||
-      usedQuestions.has(comparisonKey(clientQuestion))
-    ) {
-      clientQuestion = fallbacks[index];
-    }
-
-    usedQuestions.add(comparisonKey(clientQuestion));
-
-    return {
-      personaId: persona.id,
-      label: persona.label,
-      response: assembleResponse(body, clientQuestion),
-      shorterLiveVersion: assembleResponse(
-        cleanSpeech(removeQuestions(answer.shorterLiveBody)),
-        clientQuestion
-      ),
-      view: cleanSpeech(answer.view),
-      influences: cleanSpeech(answer.influences),
-      effects: cleanSpeech(answer.effects),
-      whatMatters: clientQuestion,
-      assumptionsMade: cleanSpeech(answer.assumptionsMade) || "None",
-      verificationNeeded: cleanSpeech(answer.verificationNeeded) || "None"
-    };
-  });
+  return {
+    personaId: BANKER_PROFILE.id,
+    label: BANKER_PROFILE.label,
+    response: assembleResponse(body, clientQuestion),
+    shorterLiveVersion: assembleResponse(
+      cleanSpeech(removeQuestions(answer.shorterLiveBody)),
+      clientQuestion
+    ),
+    view: cleanSpeech(answer.view),
+    influences: cleanSpeech(answer.influences),
+    effects: cleanSpeech(answer.effects),
+    whatMatters: clientQuestion,
+    assumptionsMade: cleanSpeech(answer.assumptionsMade) || "None",
+    verificationNeeded: cleanSpeech(answer.verificationNeeded) || "None"
+  };
 }
 
 function assembleResponse(body, clientQuestion) {
   const cleanBody = cleanSpeech(removeQuestions(body));
   if (!cleanBody) return clientQuestion;
-
   const punctuation = /[.!]$/.test(cleanBody) ? "" : ".";
   return `${cleanBody}${punctuation} ${clientQuestion}`.replace(/\s+/g, " ").trim();
 }
@@ -329,53 +283,60 @@ function assembleResponse(body, clientQuestion) {
 function removeQuestions(value) {
   const text = clean(value, 1800).trim();
   if (!text) return "";
-
-  // responseBody and shorterLiveBody must not contain questions. If the model
-  // adds one despite the schema instructions, keep only the useful statement
-  // before the first question and append clientQuestion once in code.
   const firstQuestion = text.indexOf("?");
   return (firstQuestion >= 0 ? text.slice(0, firstQuestion) : text)
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function topicSpecificFallbacks(question, clientContext) {
+function topicSpecificFallback(question, clientContext) {
   const text = `${question} ${clientContext}`.toLowerCase();
 
-  const categories = [
-    {
-      pattern: /\b(currency|currencies|foreign exchange|fx|exchange rate|sgd|myr|usd|eur|gbp|jpy|cny|thb)\b/,
-      questions: [
-        "How are you looking at this in relation to your business: an upcoming payment, a receipt, an existing exposure, or something else?",
-        "Which aspect matters most at the moment: the rate, timing, cash-flow certainty, or another priority?",
-        "Are you working towards a particular decision date or risk limit, or looking at this from a different angle?"
-      ]
-    },
-    {
-      pattern: /\b(interest rate|rates|borrowing|loan|facility|refinanc|mortgage|funding)\b/,
-      questions: [
-        "How are you thinking about this: an existing facility, new borrowing, an investment decision, or something else?",
-        "Which aspect matters most at the moment: cost, timing, certainty, flexibility, or another consideration?",
-        "Are you working towards a particular refinancing or investment decision, or looking at this from another angle?"
-      ]
-    },
-    {
-      pattern: /\b(gold|silver|precious metal|commodity|commodities)\b/,
-      questions: [
-        "Are you considering a purchase, a sale, or reviewing an existing exposure?",
-        "Which matters most here: timing, price certainty, or managing volatility?",
-        "When might you act, and how much short-term price movement can you absorb?"
-      ]
-    }
-  ];
+  if (/\b(gold|silver|precious metal|commodity|commodities)\b/.test(text)) {
+    return "What have you been hearing about it recently?";
+  }
+  if (/\b(interest rate|rates|borrowing|loan|mortgage|funding)\b/.test(text)) {
+    return "What have you been hearing about where rates may go?";
+  }
+  if (/\b(currency|foreign exchange|fx|exchange rate|sgd|myr|usd|eur|gbp|jpy|cny|thb)\b/.test(text)) {
+    return "What have you been hearing about the currency recently?";
+  }
+  if (/\b(iran|war|conflict|geopolit|election|politic)\b/.test(text)) {
+    return "What part of the situation has caught your attention most?";
+  }
 
-  return (
-    categories.find(({ pattern }) => pattern.test(text))?.questions || [
-      "How are you looking at this in relation to your business: a particular exposure, a decision, or something else?",
-      "Which practical consideration matters most: timing, cost, certainty, flexibility, or another priority?",
-      "Are you working towards a particular decision or constraint, or looking at this from a different angle?"
-    ]
-  );
+  return "What made you think about this today?";
+}
+
+function normaliseClientQuestion(value) {
+  const question = clean(value, 300)
+    .replace(/\*\*/g, "")
+    .replace(/[_`#]/g, "")
+    .replace(/^(W\s*[—–-]\s*)?(What matters|Client question)\s*:?\s*/i, "")
+    .split("?")[0]
+    .replace(/[.!]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return question ? `${question}?` : "";
+}
+
+function isGenericClientQuestion(value) {
+  const text = comparisonKey(value);
+  return [
+    "what matters most to you",
+    "how does this affect you",
+    "what decision is behind your question",
+    "what decision are you considering",
+    "would you like to know more"
+  ].some((phrase) => text.includes(phrase));
+}
+
+function comparisonKey(value) {
+  return clean(value, 400)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function formatClientInput({ question, marketRegion, clientContext }) {
@@ -414,17 +375,12 @@ function sanitiseMarketProse(value) {
   let text = clean(value, 2200).trim();
   if (!text) return "";
 
-  // Web-search citations occasionally leak into structured fields as nested
-  // markdown such as ([publisher.com] (https://...)). In these compact fields,
-  // citations are appended after the prose, so discard everything from the
-  // first URL onward and then remove any citation prefix left behind.
-  const urlIndex = text.search(/https?:\/\//i);
-  if (urlIndex >= 0) text = text.slice(0, urlIndex);
-
   return text
-    .replace(/\s*\(\s*\[[^\]]+\]\s*\(?\s*$/g, "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/gi, "$1")
+    .replace(/\(\s*\[[^\]]+\]\s*\(https?:\/\/[^)]+\)\s*\)/gi, "")
+    .replace(/\(\s*(?:https?:\/\/|www\.)[^)\s]+\s*\)/gi, "")
+    .replace(/https?:\/\/\S+/gi, "")
     .replace(/\[[^\]]+\]\s*$/g, "")
-    .replace(/\(\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\)*/gi, "")
     .replace(/\[\s*(?:source|sources|citation|\d+)\s*\]/gi, "")
     .replace(/\(\s*\)/g, "")
     .replace(/\[\s*\]/g, "")
@@ -434,44 +390,12 @@ function sanitiseMarketProse(value) {
     .replace(/[([\s]+$/, "")
     .trim();
 }
-
 function cleanSpeech(value) {
   return clean(value, 1800)
     .replace(/\*\*/g, "")
     .replace(/[_`#]/g, "")
     .replace(/\?/g, ".")
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normaliseClientQuestion(value) {
-  const question = clean(value, 300)
-    .replace(/\*\*/g, "")
-    .replace(/[_`#]/g, "")
-    .replace(/^(W\s*[—–-]\s*)?(What matters|Client question)\s*:?\s*/i, "")
-    .split("?")[0]
-    .replace(/[.!]+$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return question ? `${question}?` : "";
-}
-
-function isGenericClientQuestion(value) {
-  const text = comparisonKey(value);
-  return [
-    "what decision is behind your question",
-    "what decision are you considering",
-    "what matters most to you",
-    "how does this affect you",
-    "would you like to know more"
-  ].some((phrase) => text.includes(phrase));
-}
-
-function comparisonKey(value) {
-  return clean(value, 400)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
 
