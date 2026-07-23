@@ -8,26 +8,18 @@ const statusBox = document.querySelector("#status");
 const marketBox = document.querySelector("#marketContext");
 const answersBox = document.querySelector("#answers");
 
-const ANSWER_LABELS = [
-  "Concise and direct",
-  "Balanced and consultative",
-  "Cautious under uncertainty"
-];
-
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const question = questionInput.value.trim();
   if (!question) return;
 
+  resetOutput();
   setLoading(true);
-  statusBox.className = "status";
+
   statusBox.textContent = marketToggle.checked
-    ? "Checking current context and preparing three client-ready responses…"
-    : "Preparing three client-ready responses…";
-  marketBox.classList.add("hidden");
-  marketBox.innerHTML = "";
-  answersBox.innerHTML = "";
+    ? "Checking current context and preparing three banker perspectives…"
+    : "Preparing three banker perspectives…";
 
   try {
     const response = await fetch("/api/view", {
@@ -44,9 +36,7 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      if (data.diagnostics) {
-        console.error("VIEW API diagnostics", data.diagnostics);
-      }
+      if (data.diagnostics) console.error("VIEW API diagnostics", data.diagnostics);
       throw new Error(data.error || `Request failed (${response.status}).`);
     }
 
@@ -63,9 +53,16 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+function resetOutput() {
+  statusBox.className = "status";
+  marketBox.classList.add("hidden");
+  marketBox.innerHTML = "";
+  answersBox.innerHTML = "";
+}
+
 function setLoading(loading) {
   submitButton.disabled = loading;
-  submitButton.textContent = loading ? "Generating…" : "Generate three responses";
+  submitButton.textContent = loading ? "Generating…" : "Generate three banker perspectives";
   form.setAttribute("aria-busy", String(loading));
 }
 
@@ -73,19 +70,6 @@ function renderMarketContext(context) {
   if (!context?.baseline) return;
 
   const sources = Array.isArray(context.sources) ? context.sources : [];
-  const sourceSection = sources.length
-    ? `<details class="source-details">
-        <summary>Sources used (${sources.length})</summary>
-        <ul class="sources">
-          ${sources.map((source) => `
-            <li>
-              <a href="${escapeAttribute(source.url)}" target="_blank" rel="noopener noreferrer">
-                ${escapeHtml(source.title || "Source")}
-              </a>
-            </li>`).join("")}
-        </ul>
-      </details>`
-    : "";
 
   marketBox.innerHTML = `
     <div class="section-heading">
@@ -97,8 +81,10 @@ function renderMarketContext(context) {
     </div>
 
     ${context.assumption ? `
-      <div class="assumption"><strong>Assumption</strong><span>${escapeHtml(context.assumption)}</span></div>
-    ` : ""}
+      <div class="assumption">
+        <strong>Assumption</strong>
+        <span>${escapeHtml(context.assumption)}</span>
+      </div>` : ""}
 
     <div class="context-grid">
       ${contextPart("Baseline", context.baseline)}
@@ -106,15 +92,33 @@ function renderMarketContext(context) {
       ${contextPart("What could change", context.watch)}
     </div>
 
-    ${sourceSection}
+    ${renderSources(sources)}
     <p class="caution">${escapeHtml(context.caution || "")}</p>
   `;
+
   marketBox.classList.remove("hidden");
 }
 
+function renderSources(sources) {
+  if (!sources.length) return "";
+
+  return `<details class="source-details">
+    <summary>Sources used (${sources.length})</summary>
+    <ul class="sources">
+      ${sources.map(({ url, title }) => `
+        <li>
+          <a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
+            ${escapeHtml(title || "Source")}
+          </a>
+        </li>`).join("")}
+    </ul>
+  </details>`;
+}
+
 function contextPart(title, text) {
-  if (!text) return "";
-  return `<div class="context-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`;
+  return text
+    ? `<div class="context-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`
+    : "";
 }
 
 function renderAnswers(answers) {
@@ -126,30 +130,44 @@ function renderAnswers(answers) {
     <article class="panel answer">
       <div class="answer-heading">
         <span class="answer-number">${index + 1}</span>
-        <h2>${escapeHtml(ANSWER_LABELS[index])}</h2>
+        <h2>${escapeHtml(answer.label || `Response ${index + 1}`)}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
-      <div class="view-grid">
-        ${viewPart("V — View", answer.view)}
-        ${viewPart("I — Influences", answer.influences)}
-        ${viewPart("E — Effects", answer.effects)}
-        ${viewPart("W — Client question", answer.whatMatters)}
+      <div class="answer-actions">
+        <button class="copy-button" type="button" data-copy="${escapeAttribute(answer.response)}">
+          Copy full response
+        </button>
+        <button class="copy-button secondary" type="button" data-copy="${escapeAttribute(answer.shorterLiveVersion || answer.response)}">
+          Copy shorter live version
+        </button>
       </div>
-      <button class="copy-button" type="button" data-copy="${escapeAttribute(answer.response)}">Copy response</button>
+      <div class="view-grid">
+        ${viewPart("V — Baseline view", answer.view)}
+        ${viewPart("I — What may change it", answer.influences)}
+        ${viewPart("E — Possible implications", answer.effects)}
+        ${viewPart("W — Bridge and client question", answer.whatMatters)}
+      </div>
+      <details class="coach-details">
+        <summary>Coaching notes and shorter version</summary>
+        <div class="coach-content">
+          ${viewPart("Shorter live version", answer.shorterLiveVersion)}
+          ${viewPart("Assumptions made", answer.assumptionsMade)}
+          ${viewPart("What should be verified", answer.verificationNeeded)}
+        </div>
+      </details>
     </article>
   `).join("");
 
-  for (const button of answersBox.querySelectorAll(".copy-button")) {
+  answersBox.querySelectorAll(".copy-button").forEach((button) => {
     button.addEventListener("click", () => copyResponse(button));
-  }
+  });
 }
 
 async function copyResponse(button) {
-  const text = button.dataset.copy || "";
   const original = button.textContent;
 
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(button.dataset.copy || "");
     button.textContent = "Copied";
   } catch {
     button.textContent = "Copy failed";
@@ -167,6 +185,7 @@ function viewPart(title, text) {
 function formatDate(value) {
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
+
   return new Intl.DateTimeFormat(undefined, {
     day: "numeric",
     month: "short",
@@ -177,8 +196,11 @@ function formatDate(value) {
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;",
-    '"': "&quot;", "'": "&#039;"
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
   })[character]);
 }
 

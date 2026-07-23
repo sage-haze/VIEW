@@ -2,36 +2,59 @@ const OPENAI_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_ANSWER_MODEL = "gpt-5.6-terra";
 const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
 
-const ANSWER_LABELS = [
-  "Concise and direct",
-  "Balanced and consultative",
-  "Cautious under uncertainty"
+const PERSONAS = [
+  {
+    id: "relationship",
+    label: "Relationship-led banker",
+    guidance:
+      "Start with a clear answer in natural spoken language. Show interest in the client's underlying exposure and end with a practical question about what they are trying to manage."
+  },
+  {
+    id: "commercial",
+    label: "Commercial planning partner",
+    guidance:
+      "Frame the base case and the most relevant alternative. Translate the outlook into a planning consideration such as timing, cash flow, cost, certainty or flexibility."
+  },
+  {
+    id: "risk",
+    label: "Risk-aware specialist",
+    guidance:
+      "Give a usable view while making the key uncertainty and trigger points clear. Connect the answer to the client's decision horizon and tolerance for adverse movement."
+  }
 ];
 
-const OUTPUT_SCHEMA = {
+const VIEW_ANSWER_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     answers: {
       type: "array",
-      minItems: 3,
-      maxItems: 3,
+      minItems: PERSONAS.length,
+      maxItems: PERSONAS.length,
       items: {
         type: "object",
         additionalProperties: false,
         properties: {
+          personaId: { type: "string", enum: PERSONAS.map(({ id }) => id) },
           responseBody: { type: "string" },
+          shorterLiveVersion: { type: "string" },
           view: { type: "string" },
           influences: { type: "string" },
           effects: { type: "string" },
-          clientQuestion: { type: "string" }
+          clientQuestion: { type: "string" },
+          assumptionsMade: { type: "string" },
+          verificationNeeded: { type: "string" }
         },
         required: [
+          "personaId",
           "responseBody",
+          "shorterLiveVersion",
           "view",
           "influences",
           "effects",
-          "clientQuestion"
+          "clientQuestion",
+          "assumptionsMade",
+          "verificationNeeded"
         ]
       }
     }
@@ -39,63 +62,64 @@ const OUTPUT_SCHEMA = {
   required: ["answers"]
 };
 
-export async function onRequestPost(context) {
-  try {
-    const { request, env } = context;
+const MARKET_CONTEXT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    assumption: { type: "string" },
+    baseline: { type: "string" },
+    observed: { type: "string" },
+    watch: { type: "string" }
+  },
+  required: ["assumption", "baseline", "observed", "watch"]
+};
 
-    if (!env.OPENAI_API_KEY) {
-      return json({
-        error:
-          "OPENAI_API_KEY is not available to this Cloudflare Pages Function. " +
-          "Add it under the Pages project's runtime Variables and Secrets, then redeploy."
-      }, 500);
-    }
+export async function onRequestPost({ request, env }) {
+  try {
+    requireApiKey(env);
 
     const body = await request.json();
-    const question = clean(body.question, 1500);
-    const clientContext = clean(body.clientContext, 1000);
-    const marketRegion = clean(body.marketRegion, 120);
-    const useMarketContext = Boolean(body.useMarketContext);
+    const input = {
+      question: clean(body.question, 1500),
+      clientContext: clean(body.clientContext, 1000),
+      marketRegion: clean(body.marketRegion, 120),
+      useMarketContext: Boolean(body.useMarketContext)
+    };
 
-    if (!question) {
+    if (!input.question) {
       return json({ error: "Please enter a client question." }, 400);
     }
 
-    const answerModel = clean(env.OPENAI_ANSWER_MODEL, 120) || DEFAULT_ANSWER_MODEL;
-    const analysisModel = clean(env.OPENAI_ANALYSIS_MODEL, 120) || DEFAULT_ANALYSIS_MODEL;
+    const answerModel = modelFromEnv(
+      env.OPENAI_ANSWER_MODEL,
+      DEFAULT_ANSWER_MODEL
+    );
+    const analysisModel = modelFromEnv(
+      env.OPENAI_ANALYSIS_MODEL,
+      DEFAULT_ANALYSIS_MODEL
+    );
 
-    let marketContext = null;
+    const marketContext = input.useMarketContext
+      ? await createMarketContext({ env, model: analysisModel, ...input })
+      : null;
 
-    if (useMarketContext) {
-      marketContext = await createMarketContext({
-        env,
-        model: analysisModel,
-        question,
-        clientContext,
-        marketRegion
-      });
-    }
-
-    const answerData = await createViewAnswers({
+    const answers = await createViewAnswers({
       env,
       model: answerModel,
-      question,
-      clientContext,
-      marketRegion,
-      marketContext
+      marketContext,
+      ...input
     });
 
     return json({
-      answers: answerData.answers,
+      answers,
       marketContext,
       models: {
         answer: answerModel,
-        analysis: useMarketContext ? analysisModel : null
+        analysis: input.useMarketContext ? analysisModel : null
       }
     });
   } catch (error) {
     console.error("VIEW API error", error);
-
     return json(
       {
         error: error.publicMessage || error.message || "Unable to generate responses.",
@@ -113,7 +137,8 @@ async function createMarketContext({
   clientContext,
   marketRegion
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const asOf = new Date().toISOString().slice(0, 10);
+
   const response = await openAI(env, {
     model,
     reasoning: { effort: "low" },
@@ -122,56 +147,42 @@ async function createMarketContext({
     input: [
       {
         role: "system",
-        content:
-          "Create a brief, careful and source-based context note for a client-conversation coach. " +
-          "Use plain language and current authoritative sources."
+        content: `Prepare a compact, source-based market context for a banker answering a client question.
+
+Use current, authoritative sources. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.`
       },
       {
         role: "user",
-        content: `CURRENT DATE:
-${today}
+        content: `${formatClientInput({
+          question,
+          marketRegion,
+          clientContext
+        })}
 
-CLIENT QUESTION:
-${question}
+As of: ${asOf}
 
-MARKET OR REGION:
-${marketRegion || "Not provided."}
+Return four short fields:
+- assumption: one sentence or an empty string
+- baseline: the likely direction and horizon, no more than 55 words
+- observed: the most relevant current facts, no more than 65 words
+- watch: one or two developments that could change the view, no more than 45 words
 
-CLIENT CONTEXT:
-${clientContext || "Not provided."}
-
-Research the current baseline relevant to the question.
-
-Important rules:
-- Do not silently assume a country, currency, central bank or market.
-- If the relevant market is missing, either keep the brief genuinely general or state one explicit assumption.
-- Prefer recent primary and authoritative sources. Use the relevant central bank or regulator directly for its own decisions and statements.
-- When factual claims span more than one institution or market driver, use at least two independent authoritative sources where available.
-- Use older sources only when they are necessary to explain a current rule or historical comparison.
-- Separate observed facts from forecasts or expectations.
-- Check the direction of every causal claim. If two factors have opposing effects, state them separately rather than implying they point the same way.
-- Do not call something consensus unless the evidence supports that label.
-- State a clear forecast horizon, but do not repeat today's date inside every section.
-- Note the one or two developments most likely to change the baseline.
-- Do not give personalised investment advice.
-- Do not include markdown, URLs, citations, footnotes, source names, domains in brackets, or an offer to do more.
-
-Return plain text in exactly this format:
-Assumption: [one short sentence, or None]
-Baseline: [no more than 55 words]
-Observed: [no more than 65 words]
-Watch: [no more than 45 words]`
+Check the direction of causal claims and describe opposing forces separately.`
       }
     ],
-    max_output_tokens: 2200,
+    text: jsonFormat("market_context", MARKET_CONTEXT_SCHEMA),
+    max_output_tokens: 1800,
     store: false
   });
 
-  const parsed = parseMarketBrief(outputText(response));
+  const parsed = parseJsonOutput(response, "market context");
 
   return {
-    ...parsed,
-    asOf: today,
+    assumption: cleanSpeech(parsed.assumption),
+    baseline: cleanSpeech(parsed.baseline),
+    observed: cleanSpeech(parsed.observed),
+    watch: cleanSpeech(parsed.watch),
+    asOf,
     sources: extractSources(response),
     caution:
       "This is a time-sensitive synthesis, not a guaranteed forecast or personalised advice."
@@ -186,15 +197,14 @@ async function createViewAnswers({
   marketRegion,
   marketContext
 }) {
-  const suppliedContext = marketContext
-    ? JSON.stringify({
-        assumption: marketContext.assumption,
-        baseline: marketContext.baseline,
-        observed: marketContext.observed,
-        watch: marketContext.watch,
-        asOf: marketContext.asOf
-      })
-    : "No live market context was requested. Do not invent current facts, figures or consensus.";
+  const context = marketContext
+    ? JSON.stringify(pick(marketContext, ["assumption", "baseline", "observed", "watch", "asOf"]))
+    : "No live context was requested. Do not invent current facts, figures or market consensus.";
+
+  const personaInstructions = PERSONAS.map(
+    ({ id, label, guidance }, index) =>
+      `${index + 1}. ${label} (${id}): ${guidance}`
+  ).join("\n");
 
   const response = await openAI(env, {
     model,
@@ -202,159 +212,212 @@ async function createViewAnswers({
     input: [
       {
         role: "system",
-        content: `You are VIEW Coach.
+        content: `You are VIEW Coach. Help a junior banker respond as a reliable partner: calm, commercially aware, useful and genuinely interested in the client.
 
-VIEW means:
-V — Give a clear but appropriately cautious baseline view.
-I — Identify the main influences that could change the view.
-E — Explain one or two potential practical implications for the client. Present these as possibilities to explore rather than assume they apply, and do not merely repeat the forecast.
-W — Lead the discussion towards what may matter to the client with a bridging sentence, followed by a guided open question inviting their perspective. Where helpful, offer two or three relevant dimensions while leaving room for the client to raise another concern. The question should be tentative, broad enough to accommodate areas of interest we may not be aware of, and demonstrate the banker’s interest and desire to support.
+Use VIEW as a reasoning structure, not a spoken script:
+- V — Give a clear baseline view.
+- I — Identify only the one or two factors most likely to change it.
+- E — Translate the view into relevant business or financial implications.
+- W — Bridge from the broad picture to the client's situation, then ask one open and helpful question.
 
-Write for a banker speaking naturally to a client. Prefer short, clear sentences and ordinary spoken language. Avoid academic wording, market-note language, jargon, product pitching and internal process language. Never pretend to predict with certainty. Do not recommend a transaction before the client's objective and constraints are understood.`
+Important conversational principle: answer before asking. Do not begin with a clarifying question. Where the client's question is broad, use the most reasonable interpretation, state any material assumption lightly, provide a useful broad response, and only then invite the client to explain what matters most.
+
+The final question should be open enough to reveal something unexpected and specific enough to answer. It may offer two or three plausible examples, but must leave space for “something else”, “another priority” or “a different angle”. Avoid binary, product-led or prematurely narrow questions.
+
+Use ordinary spoken English and relatively short sentences. Avoid academic language, market-note phrasing, jargon, false certainty, excessive disclaimers and product pitching. Do not recommend a transaction until the client's objective and constraints are understood. Do not invent facts, forecasts, institutional views or current market data.`
       },
       {
         role: "user",
-        content: `CLIENT QUESTION:
-${question}
-
-MARKET OR REGION:
-${marketRegion || "Not provided."}
-
-CLIENT CONTEXT:
-${clientContext || "Not provided."}
+        content: `${formatClientInput({
+          question,
+          marketRegion,
+          clientContext
+        })}
 
 SOURCE-BASED CONTEXT:
-${suppliedContext}
+${context}
 
-Create exactly three distinct answers in this order:
+Create exactly one answer for each banker persona, in this order:
+${personaInstructions}
 
-1. Concise and direct
-- Response body: 40–65 words.
-- Lead with a direct answer.
-- Make it sound easy to say aloud.
+For each persona:
+- responseBody: a complete natural spoken response of about 90–150 words. It must answer the client first, include a natural bridge, and end with the clientQuestion.
+- shorterLiveVersion: a 45–75 word spoken version retaining the baseline, main uncertainty, one implication, bridge and open question.
+- view: a brief explanation of the baseline view.
+- influences: the one or two factors most likely to change the view.
+- effects: practical implications relevant to the likely client decision.
+- clientQuestion: one open, topic-specific question ending in a question mark. Include helpful examples where useful and preserve an explicit opening for another concern or angle.
+- assumptionsMade: state the reasonable interpretation used, or “None”.
+- verificationNeeded: identify current facts, technical details or specialist input to check, or “None”.
 
-2. Balanced and consultative
-- Response body: 75–110 words.
-- Explain the baseline and the main alternative scenario.
-- Include one practical planning implication, but do not recommend a specific transaction when client context is missing.
-
-
-3. Cautious under uncertainty
-- Response body: 65–100 words.
-- Be explicit about what is uncertain and why exact timing cannot be known.
-- Still give a usable baseline rather than avoiding the question.
-
-Requirements for every answer:
-- If the question uses an imprecise timeframe such as “soon”, briefly define a sensible horizon, for example “over the next few months”.
-- Do not silently assume a country, currency or central bank. Use the supplied market/region or state the necessary market assumption naturally in a few words.
-- The responseBody must contain no questions and no question marks.
-- Do not use the generic phrase “What decision is behind your question?”
-- Do not repeat the same wording or sentence structure across the three answers.
-- Do not mention VIEW or announce its letters in the responseBody.
-- Do not mention “the source brief”, “the analysis”, “the model”, “the assumption”, “the uncertain part” or “the usable baseline”.
+Shared quality requirements:
+- Do not start responseBody or shorterLiveVersion with a question.
+- Do not bury the baseline beneath caveats.
+- Mention only material uncertainties; do not list every scenario.
+- State a material assumption lightly in the response only when necessary.
+- Keep implications practical and relevant; do not jump to a product recommendation.
+- The bridge into W should acknowledge that relevance depends on the client's priorities or exposures.
+- Do not silently assume a market, currency, country or central bank.
+- Do not mention VIEW, the model, the prompt, the source brief or the analysis.
 - Do not include markdown, citations, URLs or unsupported figures.
-- Check that each influence has the correct directional effect. State opposing forces separately.
-- The effects field must describe a practical consequence for planning or decision-making, not restate the market direction.
-- Avoid prescriptive phrases such as “you should buy”, “you should sell”, “stage the purchase” or “hedge now” unless the supplied client context clearly supports that discussion.
-- Avoid vague endings such as “it depends on your priorities”. Ask a concrete question instead.
-
-The separate VIEW fields should be short summaries, not repetitions of the full response.`
+- The three answers must differ in banker perspective and emphasis, not merely in confidence, wording or length.
+- The short VIEW fields should explain the structure rather than repeat the response verbatim.`
       }
     ],
     text: {
       verbosity: "medium",
-      format: {
-        type: "json_schema",
-        name: "view_answers",
-        strict: true,
-        schema: OUTPUT_SCHEMA
-      }
+      ...jsonFormat("view_answers", VIEW_ANSWER_SCHEMA)
     },
-    max_output_tokens: 5200,
+    max_output_tokens: 4200,
     store: false
   });
 
-  const text = outputText(response);
-  let parsed;
-
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    const error = new Error("The model returned text, but it was not valid structured JSON.");
-    error.diagnostics = {
-      requestId: response._requestId || null,
-      status: response.status || null,
-      outputPreview: text.slice(0, 240)
-    };
-    throw error;
-  }
-
-  if (!Array.isArray(parsed.answers) || parsed.answers.length !== 3) {
-    throw new Error("The model did not return exactly three VIEW answers.");
-  }
-
-  return {
-    answers: normaliseAnswers(parsed.answers, question, clientContext)
-  };
+  const parsed = parseJsonOutput(response, "VIEW answers");
+  return normaliseAnswers(parsed.answers, question, clientContext);
 }
 
 function normaliseAnswers(answers, question, clientContext) {
-  const fallbackQuestions = topicSpecificFallbacks(question, clientContext);
+  const byId = new Map(answers.map((answer) => [answer.personaId, answer]));
+  const fallbacks = topicSpecificFallbacks(question, clientContext);
   const usedQuestions = new Set();
 
-  return answers.map((answer, index) => {
+  return PERSONAS.map((persona, index) => {
+    const answer = byId.get(persona.id) || answers[index] || {};
     const body = cleanSpeech(answer.responseBody);
     let clientQuestion = normaliseClientQuestion(answer.clientQuestion);
-    const key = comparisonKey(clientQuestion);
 
     if (
       !clientQuestion ||
       isGenericClientQuestion(clientQuestion) ||
-      usedQuestions.has(key)
+      usedQuestions.has(comparisonKey(clientQuestion))
     ) {
-      clientQuestion = fallbackQuestions[index];
+      clientQuestion = fallbacks[index];
     }
 
     usedQuestions.add(comparisonKey(clientQuestion));
 
     return {
-      label: ANSWER_LABELS[index],
-      response: `${body} ${clientQuestion}`.trim(),
+      personaId: persona.id,
+      label: persona.label,
+      response: ensureEndsWithQuestion(body, clientQuestion),
+      shorterLiveVersion: ensureEndsWithQuestion(
+        cleanSpeech(answer.shorterLiveVersion),
+        clientQuestion
+      ),
       view: cleanSpeech(answer.view),
       influences: cleanSpeech(answer.influences),
       effects: cleanSpeech(answer.effects),
-      whatMatters: clientQuestion
+      whatMatters: clientQuestion,
+      assumptionsMade: cleanSpeech(answer.assumptionsMade) || "None",
+      verificationNeeded: cleanSpeech(answer.verificationNeeded) || "None"
     };
   });
+}
+
+function ensureEndsWithQuestion(body, clientQuestion) {
+  const cleanBody = cleanSpeech(body).replace(/[.!]+$/, "");
+  if (!cleanBody) return clientQuestion;
+
+  const bodyKey = comparisonKey(cleanBody);
+  const questionKey = comparisonKey(clientQuestion);
+  if (questionKey && bodyKey.endsWith(questionKey)) {
+    return `${cleanBody}?`;
+  }
+
+  return `${cleanBody}. ${clientQuestion}`.trim();
+}
+
+function topicSpecificFallbacks(question, clientContext) {
+  const text = `${question} ${clientContext}`.toLowerCase();
+
+  const categories = [
+    {
+      pattern: /\b(currency|currencies|foreign exchange|fx|exchange rate|sgd|myr|usd|eur|gbp|jpy|cny|thb)\b/,
+      questions: [
+        "How are you looking at this in relation to your business: an upcoming payment, a receipt, an existing exposure, or something else?",
+        "Which aspect matters most at the moment: the rate, timing, cash-flow certainty, or another priority?",
+        "Are you working towards a particular decision date or risk limit, or looking at this from a different angle?"
+      ]
+    },
+    {
+      pattern: /\b(interest rate|rates|borrowing|loan|facility|refinanc|mortgage|funding)\b/,
+      questions: [
+        "How are you thinking about this: an existing facility, new borrowing, an investment decision, or something else?",
+        "Which aspect matters most at the moment: cost, timing, certainty, flexibility, or another consideration?",
+        "Are you working towards a particular refinancing or investment decision, or looking at this from another angle?"
+      ]
+    },
+    {
+      pattern: /\b(gold|silver|precious metal|commodity|commodities)\b/,
+      questions: [
+        "Are you considering a purchase, a sale, or reviewing an existing exposure?",
+        "Which matters most here: timing, price certainty, or managing volatility?",
+        "When might you act, and how much short-term price movement can you absorb?"
+      ]
+    }
+  ];
+
+  return (
+    categories.find(({ pattern }) => pattern.test(text))?.questions || [
+      "How are you looking at this in relation to your business: a particular exposure, a decision, or something else?",
+      "Which practical consideration matters most: timing, cost, certainty, flexibility, or another priority?",
+      "Are you working towards a particular decision or constraint, or looking at this from a different angle?"
+    ]
+  );
+}
+
+function formatClientInput({ question, marketRegion, clientContext }) {
+  return `CLIENT QUESTION:\n${question}\n\nMARKET OR REGION:\n${
+    marketRegion || "Not provided."
+  }\n\nCLIENT CONTEXT:\n${clientContext || "Not provided."}`;
+}
+
+function jsonFormat(name, schema) {
+  return {
+    format: {
+      type: "json_schema",
+      name,
+      strict: true,
+      schema
+    }
+  };
+}
+
+function parseJsonOutput(response, description) {
+  const text = outputText(response);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const error = new Error(`The model returned invalid structured ${description}.`);
+    error.diagnostics = {
+      requestId: response._requestId || null,
+      outputPreview: text.slice(0, 240)
+    };
+    throw error;
+  }
 }
 
 function cleanSpeech(value) {
   return clean(value, 1800)
     .replace(/\*\*/g, "")
     .replace(/[_`#]/g, "")
-    .replace(/^(Using|Based on) (?:the )?source(?:-based)? brief(?:[’']s)?[^,]*,\s*/i, "")
-    .replace(/\bthe source(?:-based)? brief\b/gi, "current information")
-    .replace(/\bthe uncertain part is\b/gi, "the timing is")
-    .replace(/\bthe usable baseline\b/gi, "the practical baseline")
     .replace(/\?/g, ".")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function normaliseClientQuestion(value) {
-  let question = clean(value, 300)
+  const question = clean(value, 300)
     .replace(/\*\*/g, "")
     .replace(/[_`#]/g, "")
     .replace(/^(W\s*[—–-]\s*)?(What matters|Client question)\s*:?\s*/i, "")
+    .split("?")[0]
+    .replace(/[.!]+$/, "")
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!question) return "";
-
-  question = question.split("?")[0].replace(/[.!]+$/, "").trim();
-  if (!question) return "";
-
-  return `${question}?`;
+  return question ? `${question}?` : "";
 }
 
 function isGenericClientQuestion(value) {
@@ -375,97 +438,21 @@ function comparisonKey(value) {
     .trim();
 }
 
-function topicSpecificFallbacks(question, clientContext) {
-  const text = `${question} ${clientContext}`.toLowerCase();
-
-  if (/\b(gold|silver|precious metal|commodity|commodities)\b/.test(text)) {
-    return [
-      "Are you considering buying, selling, or reviewing an existing exposure?",
-      "Is your main concern the timing of a purchase, a sale, or managing price risk?",
-      "How soon might you need to act, and how much short-term volatility could you accommodate?"
-    ];
-  }
-
-  if (/\b(interest rate|rates|borrowing|loan|facility|refinanc|mortgage|funding)\b/.test(text)) {
-    return [
-      "Are you asking about an existing borrowing cost, a new facility, or an investment decision?",
-      "Is your main concern cost, timing, certainty, or retaining flexibility?",
-      "How soon do you need to decide, and how much rate uncertainty can you accommodate?"
-    ];
-  }
-
-  if (/\b(currency|currencies|foreign exchange|fx|exchange rate)\b/.test(text)) {
-    return [
-      "Are you planning a payment, a receipt, or reviewing an existing currency exposure?",
-      "Is your main concern the exchange rate, timing, or certainty of cash flow?",
-      "How soon might you need to act, and how much exchange-rate movement could you tolerate?"
-    ];
-  }
-
-  if (/\b(stock|stocks|share|shares|equity|equities|portfolio|investment market)\b/.test(text)) {
-    return [
-      "Are you considering buying, selling, or reviewing an existing position?",
-      "Is your main concern timing, valuation, or managing downside risk?",
-      "How soon might you need to act, and how much short-term volatility could you accommodate?"
-    ];
-  }
-
-  if (/\b(inflation|economy|economic|recession|growth|gdp)\b/.test(text)) {
-    return [
-      "Is this mainly about pricing, funding, investment, or cash-flow planning?",
-      "Which business decision is most exposed to this outlook?",
-      "How soon do you need to decide, and what level of uncertainty can you plan around?"
-    ];
-  }
-
-  return [
-    "Are you considering acting now, waiting, or reviewing an existing position?",
-    "Is your main concern cost, timing, certainty, or flexibility?",
-    "How soon do you need to decide, and how much uncertainty can you accommodate?"
-  ];
+function pick(object, keys) {
+  return Object.fromEntries(keys.map((key) => [key, object[key]]));
 }
 
-function parseMarketBrief(text) {
-  const cleaned = cleanMarketText(text);
-  const fields = {
-    assumption: "",
-    baseline: "",
-    observed: "",
-    watch: ""
-  };
-
-  for (const line of cleaned.split(/\n+/)) {
-    const match = line.match(/^\s*(Assumption|Baseline|Observed|Watch)\s*:\s*(.*)$/i);
-    if (!match) continue;
-    fields[match[1].toLowerCase()] = match[2].trim();
-  }
-
-  if (!fields.baseline) {
-    const paragraphs = cleaned.split(/\n\s*\n/).filter(Boolean);
-    fields.baseline = paragraphs[0] || cleaned;
-    fields.observed = paragraphs[1] || "";
-    fields.watch = paragraphs[2] || "";
-  }
-
-  if (/^none\.?$/i.test(fields.assumption)) fields.assumption = "";
-
-  return fields;
+function requireApiKey(env) {
+  if (env.OPENAI_API_KEY) return;
+  const error = new Error(
+    "OPENAI_API_KEY is not available to this Cloudflare Pages Function. Add it under the Pages project's runtime Variables and Secrets, then redeploy."
+  );
+  error.status = 500;
+  throw error;
 }
 
-function cleanMarketText(value) {
-  return clean(value, 5000)
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/__(.*?)__/g, "$1")
-    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/【[^】]+】/g, "")
-    .replace(/\s*[([](?:www\.)?[a-z0-9.-]+\.(?:com|org|gov|edu|net|io|co|sg|uk|au)(?:\.[a-z]{2})?[)\]]/gi, "")
-    .replace(/^\s*[-*]\s+/gm, "")
-    .replace(/^#+\s*/gm, "")
-    .replace(/^If helpful,.*$/gim, "")
-    .replace(/\s+([,.;:])/g, "$1")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+function modelFromEnv(value, fallback) {
+  return clean(value, 120) || fallback;
 }
 
 async function openAI(env, payload) {
@@ -504,7 +491,7 @@ function outputText(response) {
     return response.output_text.trim();
   }
 
-  const parts = [];
+  const textParts = [];
   const refusals = [];
 
   for (const item of response.output || []) {
@@ -512,52 +499,39 @@ function outputText(response) {
 
     for (const content of item.content || []) {
       if (content.type === "output_text" && content.text) {
-        parts.push(content.text);
-      }
-
-      if (content.type === "refusal" && content.refusal) {
+        textParts.push(content.text);
+      } else if (content.type === "refusal" && content.refusal) {
         refusals.push(content.refusal);
       }
     }
   }
 
-  if (parts.length) return parts.join("\n").trim();
-
-  const outputTypes = (response.output || []).map((item) => item.type);
-  const incompleteReason = response.incomplete_details?.reason || null;
-  const requestId = response._requestId || null;
-
-  if (refusals.length) {
-    const error = new Error(`OpenAI refused the request: ${refusals.join(" ")}`);
-    error.diagnostics = { status: response.status, outputTypes, requestId };
-    throw error;
-  }
+  if (textParts.length) return textParts.join("\n").trim();
 
   const error = new Error(
-    `OpenAI returned no text (status: ${response.status || "unknown"}; ` +
-    `output types: ${outputTypes.join(", ") || "none"}).` +
-    (requestId ? ` Request ID: ${requestId}.` : "")
+    refusals.length
+      ? `OpenAI refused the request: ${refusals.join(" ")}`
+      : "OpenAI returned no text."
   );
   error.diagnostics = {
+    requestId: response._requestId || null,
     status: response.status || null,
-    incompleteReason,
-    outputTypes,
-    requestId,
+    incompleteReason: response.incomplete_details?.reason || null,
+    outputTypes: (response.output || []).map((item) => item.type),
     usage: response.usage || null
   };
   throw error;
 }
 
 function extractSources(response) {
-  const cited = new Map();
-  const searched = new Map();
+  const sources = new Map();
 
   for (const item of response.output || []) {
     if (item.type === "message") {
       for (const content of item.content || []) {
         for (const annotation of content.annotations || []) {
           if (annotation.type === "url_citation" && annotation.url) {
-            addSource(cited, annotation.url, annotation.title);
+            addSource(sources, annotation.url, annotation.title);
           }
         }
       }
@@ -565,32 +539,18 @@ function extractSources(response) {
 
     if (item.type === "web_search_call") {
       for (const source of item.action?.sources || []) {
-        if (source.url) addSource(searched, source.url, source.title);
+        if (source.url) addSource(sources, source.url, source.title);
       }
     }
   }
 
-  const combined = new Map();
-
-  for (const source of cited.values()) {
-    combined.set(source.url, source);
-  }
-
-  for (const source of searched.values()) {
-    if (!combined.has(source.url)) combined.set(source.url, source);
-  }
-
-  return [...combined.values()].slice(0, 5);
+  return [...sources.values()].slice(0, 5);
 }
 
 function addSource(map, rawUrl, rawTitle) {
   const url = normaliseUrl(rawUrl);
   if (!url || map.has(url)) return;
-
-  map.set(url, {
-    title: sourceTitle(rawTitle, url),
-    url
-  });
+  map.set(url, { title: sourceTitle(rawTitle, url), url });
 }
 
 function normaliseUrl(rawUrl) {
@@ -613,14 +573,7 @@ function sourceTitle(rawTitle, url) {
   if (title && !/^https?:\/\//i.test(title)) return title;
 
   try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./, "");
-    const lastPart = parsed.pathname.split("/").filter(Boolean).pop() || "Source";
-    const label = decodeURIComponent(lastPart)
-      .replace(/[-_]+/g, " ")
-      .replace(/\.(html?|pdf)$/i, "")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
-    return `${host} — ${label}`;
+    return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return "Source";
   }
@@ -633,8 +586,6 @@ function clean(value, limit) {
 function json(body, status = 200) {
   return Response.json(body, {
     status,
-    headers: {
-      "Cache-Control": "no-store"
-    }
+    headers: { "Cache-Control": "no-store" }
   });
 }

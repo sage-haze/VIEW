@@ -1,30 +1,29 @@
-# VIEW Framework — next response-quality update
+# VIEW Framework — complete GitHub replacement
 
-This package keeps the user's revised HTML layout and updates the generation logic behind the three answers.
+This folder is a complete Cloudflare Pages project. Upload **the contents of this folder** to the root of your GitHub repository, replacing the existing files.
 
-## What changed
+## What this version changes
 
-- Keeps the revised `VIEW Framework` header and form layout.
-- Makes the three client questions different and topic-specific.
-- Uses deterministic topic-specific fallback questions if the model returns a generic or repeated question.
-- Makes **E — Effects** a practical implication rather than another forecast sentence.
-- Stops the cautious answer from referring to “the source brief”, “the assumption”, “the uncertain part”, or “the usable baseline”.
-- Avoids recommending a purchase, sale, staging strategy, or hedge before the client's objective is understood.
-- Separates market factors that have opposing directional effects.
-- Requests multiple authoritative sources when facts span different institutions.
-- Combines cited and web-search sources instead of showing only one cited source.
-- Removes bare source domains such as `(gold.org)` from the visible market brief.
+- Refactors the answer prompt to remove repeated and overly prescriptive instructions.
+- Generates three genuinely different banker perspectives:
+  1. Relationship-led banker
+  2. Commercial planning partner
+  3. Risk-aware specialist
+- Uses structured JSON output for the market brief and the three responses.
+- Keeps the VIEW framework visible in every answer.
+- Returns persona labels from the server instead of duplicating them in browser code.
+- Uses topic-specific fallback client questions when the model repeats or produces a generic question.
+- Preserves the API health and API-key test endpoints.
 
-## Files to upload
-
-Upload the contents of this folder to the root of the existing GitHub repository:
+## Repository structure
 
 ```text
+_headers
 index.html
 app.js
 styles.css
-_headers
 package.json
+README.md
 functions/
   api/
     health.js
@@ -32,12 +31,35 @@ functions/
     view.js
 ```
 
-Your Cloudflare variables remain:
+## Cloudflare Pages settings
+
+Keep these runtime bindings under **Settings → Variables and Secrets** for the Production environment:
 
 ```text
-OPENAI_API_KEY          secret
+OPENAI_API_KEY          Secret
 OPENAI_ANSWER_MODEL     gpt-5.6-terra
 OPENAI_ANALYSIS_MODEL   gpt-5.4-mini
 ```
 
-Commit the files and wait for a new Cloudflare Production deployment.
+`OPENAI_API_KEY` must be a runtime secret, not a value placed in the browser code or GitHub repository.
+
+## Deployment
+
+1. Delete or replace the existing repository files with the contents of this folder.
+2. Commit the changes to the branch connected to Cloudflare Pages.
+3. Wait for the Production deployment to complete.
+4. Test these URLs:
+
+```text
+https://YOUR-DOMAIN/api/health
+https://YOUR-DOMAIN/api/test
+```
+
+The health endpoint should show that the API key is configured. The test endpoint should confirm that OpenAI accepted the key.
+
+## Notes
+
+- The site uses Cloudflare Pages Functions, so the `functions` directory must remain at the repository root.
+- The browser calls `/api/view`; the API key is only read inside the Cloudflare Function.
+- Current market context is optional and uses the analysis model with web search.
+- Do not enter confidential client information.

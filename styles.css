@@ -210,3 +210,39 @@ footer { color: #657086; font-size: .85rem; padding: 18px 4px; }
 .assumption span {
   display: block;
 }
+
+
+.answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.8rem 0 1rem;
+}
+
+.copy-button.secondary {
+  background: transparent;
+}
+
+.coach-details {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.8rem;
+}
+
+.coach-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.coach-content {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .coach-content {
+    grid-template-columns: 1fr;
+  }
+}
