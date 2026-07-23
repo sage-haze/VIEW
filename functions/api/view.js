@@ -145,14 +145,16 @@ Research the current baseline relevant to the question.
 Important rules:
 - Do not silently assume a country, currency, central bank or market.
 - If the relevant market is missing, either keep the brief genuinely general or state one explicit assumption.
-- Prefer recent primary and authoritative sources.
+- Prefer recent primary and authoritative sources. Use the relevant central bank or regulator directly for its own decisions and statements.
+- When factual claims span more than one institution or market driver, use at least two independent authoritative sources where available.
 - Use older sources only when they are necessary to explain a current rule or historical comparison.
 - Separate observed facts from forecasts or expectations.
+- Check the direction of every causal claim. If two factors have opposing effects, state them separately rather than implying they point the same way.
 - Do not call something consensus unless the evidence supports that label.
-- State the relevant date or forecast horizon.
+- State a clear forecast horizon, but do not repeat today's date inside every section.
 - Note the one or two developments most likely to change the baseline.
 - Do not give personalised investment advice.
-- Do not include markdown, URLs, citations, footnotes, source names or an offer to do more.
+- Do not include markdown, URLs, citations, footnotes, source names, domains in brackets, or an offer to do more.
 
 Return plain text in exactly this format:
 Assumption: [one short sentence, or None]
@@ -205,10 +207,10 @@ async function createViewAnswers({
 VIEW means:
 V — Give a clear but appropriately cautious baseline view.
 I — Identify the main influences that could change the view.
-E — Explain possible practical effects or implications.
-W — connect the discussion to what matters to the client with one direct question.
+E — Explain the practical implication for the client's decision; do not merely repeat the forecast.
+W — Connect the discussion to what matters to the client with one direct, topic-specific question.
 
-Write for a banker speaking naturally to a client. Prefer short, clear sentences. Avoid academic wording, market-note language, jargon and product pitching. Never pretend to predict with certainty.`
+Write for a banker speaking naturally to a client. Prefer short, clear sentences and ordinary spoken language. Avoid academic wording, market-note language, jargon, product pitching and internal process language. Never pretend to predict with certainty. Do not recommend a transaction before the client's objective and constraints are understood.`
       },
       {
         role: "user",
@@ -227,29 +229,38 @@ ${suppliedContext}
 Create exactly three distinct answers in this order:
 
 1. Concise and direct
-- Response body: 45–70 words.
+- Response body: 40–65 words.
 - Lead with a direct answer.
 - Use no more than one qualifying phrase.
+- Make it sound easy to say aloud.
+- Client question: ask about the concrete action or exposure behind the question, using topic-relevant choices where possible.
 
 2. Balanced and consultative
-- Response body: 80–115 words.
+- Response body: 75–110 words.
 - Explain the baseline and the main alternative scenario.
-- Include one practical planning implication.
+- Include one practical planning implication, but do not recommend a specific transaction when client context is missing.
+- Client question: ask which practical dimension matters most, such as timing, cost, certainty, liquidity, exposure or flexibility, tailored to the topic.
 
 3. Cautious under uncertainty
-- Response body: 70–105 words.
+- Response body: 65–100 words.
 - Be explicit about what is uncertain and why exact timing cannot be known.
 - Still give a usable baseline rather than avoiding the question.
+- Client question: ask about the client's decision horizon and their ability to accommodate the relevant uncertainty or volatility.
 
 Requirements for every answer:
 - If the question uses an imprecise timeframe such as “soon”, briefly define a sensible horizon, for example “over the next few months”.
-- Do not silently assume a country, currency or central bank. Use the supplied market/region or state the source brief's assumption in a few words.
+- Do not silently assume a country, currency or central bank. Use the supplied market/region or state the necessary market assumption naturally in a few words.
 - The responseBody must contain no questions and no question marks.
 - The clientQuestion must be exactly one short, direct question ending in a question mark.
-- Tailor the clientQuestion to the stated client context. If no context is supplied, ask what decision is behind the question.
+- Each clientQuestion must be distinct, specific to the topic and useful for a real follow-up conversation.
+- Do not use the generic phrase “What decision is behind your question?”
 - Do not repeat the same wording or sentence structure across the three answers.
 - Do not mention VIEW or announce its letters in the responseBody.
+- Do not mention “the source brief”, “the analysis”, “the model”, “the assumption”, “the uncertain part” or “the usable baseline”.
 - Do not include markdown, citations, URLs or unsupported figures.
+- Check that each influence has the correct directional effect. State opposing forces separately.
+- The effects field must describe a practical consequence for planning or decision-making, not restate the market direction.
+- Avoid prescriptive phrases such as “you should buy”, “you should sell”, “stage the purchase” or “hedge now” unless the supplied client context clearly supports that discussion.
 - Avoid vague endings such as “it depends on your priorities”. Ask a concrete question instead.
 
 The separate VIEW fields should be short summaries, not repetitions of the full response.`
@@ -288,43 +299,54 @@ The separate VIEW fields should be short summaries, not repetitions of the full 
   }
 
   return {
-    answers: parsed.answers.map((answer, index) =>
-      normaliseAnswer(answer, index, clientContext)
-    )
+    answers: normaliseAnswers(parsed.answers, question, clientContext)
   };
 }
 
-function normaliseAnswer(answer, index, clientContext) {
-  const body = cleanSpeech(answer.responseBody);
-  const clientQuestion = normaliseClientQuestion(
-    answer.clientQuestion,
-    clientContext
-  );
+function normaliseAnswers(answers, question, clientContext) {
+  const fallbackQuestions = topicSpecificFallbacks(question, clientContext);
+  const usedQuestions = new Set();
 
-  return {
-    label: ANSWER_LABELS[index],
-    response: `${body} ${clientQuestion}`.trim(),
-    view: cleanSpeech(answer.view),
-    influences: cleanSpeech(answer.influences),
-    effects: cleanSpeech(answer.effects),
-    whatMatters: clientQuestion
-  };
+  return answers.map((answer, index) => {
+    const body = cleanSpeech(answer.responseBody);
+    let clientQuestion = normaliseClientQuestion(answer.clientQuestion);
+    const key = comparisonKey(clientQuestion);
+
+    if (
+      !clientQuestion ||
+      isGenericClientQuestion(clientQuestion) ||
+      usedQuestions.has(key)
+    ) {
+      clientQuestion = fallbackQuestions[index];
+    }
+
+    usedQuestions.add(comparisonKey(clientQuestion));
+
+    return {
+      label: ANSWER_LABELS[index],
+      response: `${body} ${clientQuestion}`.trim(),
+      view: cleanSpeech(answer.view),
+      influences: cleanSpeech(answer.influences),
+      effects: cleanSpeech(answer.effects),
+      whatMatters: clientQuestion
+    };
+  });
 }
 
 function cleanSpeech(value) {
   return clean(value, 1800)
     .replace(/\*\*/g, "")
     .replace(/[_`#]/g, "")
+    .replace(/^(Using|Based on) (?:the )?source(?:-based)? brief(?:[’']s)?[^,]*,\s*/i, "")
+    .replace(/\bthe source(?:-based)? brief\b/gi, "current information")
+    .replace(/\bthe uncertain part is\b/gi, "the timing is")
+    .replace(/\bthe usable baseline\b/gi, "the practical baseline")
     .replace(/\?/g, ".")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function normaliseClientQuestion(value, clientContext) {
-  const fallback = clientContext
-    ? "Which part of that decision matters most: cost, timing, certainty, or flexibility?"
-    : "What decision are you considering, and is the main concern cost, timing, or certainty?";
-
+function normaliseClientQuestion(value) {
   let question = clean(value, 300)
     .replace(/\*\*/g, "")
     .replace(/[_`#]/g, "")
@@ -332,12 +354,80 @@ function normaliseClientQuestion(value, clientContext) {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!question) return fallback;
+  if (!question) return "";
 
   question = question.split("?")[0].replace(/[.!]+$/, "").trim();
-  if (!question) return fallback;
+  if (!question) return "";
 
   return `${question}?`;
+}
+
+function isGenericClientQuestion(value) {
+  const text = comparisonKey(value);
+  return [
+    "what decision is behind your question",
+    "what decision are you considering",
+    "what matters most to you",
+    "how does this affect you",
+    "would you like to know more"
+  ].some((phrase) => text.includes(phrase));
+}
+
+function comparisonKey(value) {
+  return clean(value, 400)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function topicSpecificFallbacks(question, clientContext) {
+  const text = `${question} ${clientContext}`.toLowerCase();
+
+  if (/\b(gold|silver|precious metal|commodity|commodities)\b/.test(text)) {
+    return [
+      "Are you considering buying, selling, or reviewing an existing exposure?",
+      "Is your main concern the timing of a purchase, a sale, or managing price risk?",
+      "How soon might you need to act, and how much short-term volatility could you accommodate?"
+    ];
+  }
+
+  if (/\b(interest rate|rates|borrowing|loan|facility|refinanc|mortgage|funding)\b/.test(text)) {
+    return [
+      "Are you asking about an existing borrowing cost, a new facility, or an investment decision?",
+      "Is your main concern cost, timing, certainty, or retaining flexibility?",
+      "How soon do you need to decide, and how much rate uncertainty can you accommodate?"
+    ];
+  }
+
+  if (/\b(currency|currencies|foreign exchange|fx|exchange rate)\b/.test(text)) {
+    return [
+      "Are you planning a payment, a receipt, or reviewing an existing currency exposure?",
+      "Is your main concern the exchange rate, timing, or certainty of cash flow?",
+      "How soon might you need to act, and how much exchange-rate movement could you tolerate?"
+    ];
+  }
+
+  if (/\b(stock|stocks|share|shares|equity|equities|portfolio|investment market)\b/.test(text)) {
+    return [
+      "Are you considering buying, selling, or reviewing an existing position?",
+      "Is your main concern timing, valuation, or managing downside risk?",
+      "How soon might you need to act, and how much short-term volatility could you accommodate?"
+    ];
+  }
+
+  if (/\b(inflation|economy|economic|recession|growth|gdp)\b/.test(text)) {
+    return [
+      "Is this mainly about pricing, funding, investment, or cash-flow planning?",
+      "Which business decision is most exposed to this outlook?",
+      "How soon do you need to decide, and what level of uncertainty can you plan around?"
+    ];
+  }
+
+  return [
+    "Are you considering acting now, waiting, or reviewing an existing position?",
+    "Is your main concern cost, timing, certainty, or flexibility?",
+    "How soon do you need to decide, and how much uncertainty can you accommodate?"
+  ];
 }
 
 function parseMarketBrief(text) {
@@ -373,9 +463,12 @@ function cleanMarketText(value) {
     .replace(/__(.*?)__/g, "$1")
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
     .replace(/https?:\/\/\S+/g, "")
+    .replace(/【[^】]+】/g, "")
+    .replace(/\s*[([](?:www\.)?[a-z0-9.-]+\.(?:com|org|gov|edu|net|io|co|sg|uk|au)(?:\.[a-z]{2})?[)\]]/gi, "")
     .replace(/^\s*[-*]\s+/gm, "")
     .replace(/^#+\s*/gm, "")
     .replace(/^If helpful,.*$/gim, "")
+    .replace(/\s+([,.;:])/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -482,8 +575,17 @@ function extractSources(response) {
     }
   }
 
-  const preferred = cited.size ? [...cited.values()] : [...searched.values()];
-  return preferred.slice(0, 5);
+  const combined = new Map();
+
+  for (const source of cited.values()) {
+    combined.set(source.url, source);
+  }
+
+  for (const source of searched.values()) {
+    if (!combined.has(source.url)) combined.set(source.url, source);
+  }
+
+  return [...combined.values()].slice(0, 5);
 }
 
 function addSource(map, rawUrl, rawTitle) {

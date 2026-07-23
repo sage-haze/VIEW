@@ -201,3 +201,12 @@ footer { color: #657086; font-size: .85rem; padding: 18px 4px; }
   .section-heading { display: block; }
   .as-of { display: inline-block; margin-top: 10px; }
 }
+
+.hero > p {
+  margin: .35rem 0 0;
+  color: #566178;
+}
+
+.assumption span {
+  display: block;
+}

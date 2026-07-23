@@ -1,58 +1,43 @@
-# VIEW Conversation Coach — improved version
+# VIEW Framework — next response-quality update
 
-This version keeps the working Cloudflare Pages/OpenAI setup and improves the
-quality and presentation of the generated responses.
+This package keeps the user's revised HTML layout and updates the generation logic behind the three answers.
 
-## Main improvements
+## What changed
 
-- Uses `gpt-5.6-terra` as the answer-model fallback.
-- Uses `gpt-5.4-mini` as the web-analysis fallback.
-- Adds an optional Market or region field so the coach does not silently assume
-  a central bank or jurisdiction.
-- Makes the three answer styles meaningfully different.
-- Defines vague timeframes such as “soon” in the spoken response.
-- Guarantees that each response ends with one direct client-relevant question.
-- Uses fixed interface labels, removing duplicated numbering such as `1. 1.`.
-- Cleans markdown and URLs out of the market summary.
-- Separates the market brief into Baseline, Observed facts, and What could change.
-- Deduplicates source links, removes tracking parameters, prioritises cited
-  sources, and shows at most five.
-- Adds a Copy response button to each answer.
-- Corrects the model names shown by `/api/health`.
+- Keeps the revised `VIEW Framework` header and form layout.
+- Makes the three client questions different and topic-specific.
+- Uses deterministic topic-specific fallback questions if the model returns a generic or repeated question.
+- Makes **E — Effects** a practical implication rather than another forecast sentence.
+- Stops the cautious answer from referring to “the source brief”, “the assumption”, “the uncertain part”, or “the usable baseline”.
+- Avoids recommending a purchase, sale, staging strategy, or hedge before the client's objective is understood.
+- Separates market factors that have opposing directional effects.
+- Requests multiple authoritative sources when facts span different institutions.
+- Combines cited and web-search sources instead of showing only one cited source.
+- Removes bare source domains such as `(gold.org)` from the visible market brief.
 
-## Repository structure
+## Files to upload
+
+Upload the contents of this folder to the root of the existing GitHub repository:
 
 ```text
-/
-├── index.html
-├── app.js
-├── styles.css
-├── _headers
-├── package.json
-└── functions/
-    └── api/
-        ├── health.js
-        ├── test.js
-        └── view.js
+index.html
+app.js
+styles.css
+_headers
+package.json
+functions/
+  api/
+    health.js
+    test.js
+    view.js
 ```
 
-## Cloudflare Pages settings
+Your Cloudflare variables remain:
 
-- Framework preset: None
-- Build command: leave blank
-- Build output directory: `/` or repository root
-- Root directory: leave blank
+```text
+OPENAI_API_KEY          secret
+OPENAI_ANSWER_MODEL     gpt-5.6-terra
+OPENAI_ANALYSIS_MODEL   gpt-5.4-mini
+```
 
-## Required secret
-
-- `OPENAI_API_KEY` — Secret
-
-## Optional model variables
-
-The built-in fallbacks are:
-
-- `OPENAI_ANSWER_MODEL=gpt-5.6-terra`
-- `OPENAI_ANALYSIS_MODEL=gpt-5.4-mini`
-
-After replacing the GitHub files, commit the changes and wait for a new
-Cloudflare Production deployment.
+Commit the files and wait for a new Cloudflare Production deployment.

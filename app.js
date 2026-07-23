@@ -53,6 +53,7 @@ form.addEventListener("submit", async (event) => {
     renderMarketContext(data.marketContext);
     renderAnswers(data.answers);
     statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
+    answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     console.error(error);
     statusBox.className = "status error";
@@ -65,6 +66,7 @@ form.addEventListener("submit", async (event) => {
 function setLoading(loading) {
   submitButton.disabled = loading;
   submitButton.textContent = loading ? "Generating…" : "Generate three responses";
+  form.setAttribute("aria-busy", String(loading));
 }
 
 function renderMarketContext(context) {
@@ -95,7 +97,7 @@ function renderMarketContext(context) {
     </div>
 
     ${context.assumption ? `
-      <div class="assumption"><strong>Assumption</strong>${escapeHtml(context.assumption)}</div>
+      <div class="assumption"><strong>Assumption</strong><span>${escapeHtml(context.assumption)}</span></div>
     ` : ""}
 
     <div class="context-grid">
