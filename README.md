@@ -63,3 +63,12 @@ The health endpoint should show that the API key is configured. The test endpoin
 - The browser calls `/api/view`; the API key is only read inside the Cloudflare Function.
 - Current market context is optional and uses the analysis model with web search.
 - Do not enter confidential client information.
+
+## July 2026 response-quality update
+
+This version also:
+
+- removes citation text and URLs from the market-brief cards while retaining links under **Sources used**;
+- generates response bodies and final client questions separately, then joins them once to prevent duplicated questions;
+- shortens the market brief for improved card readability;
+- sharpens the distinction between relationship-led, commercial-planning and risk-aware responses.

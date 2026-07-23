@@ -7,19 +7,19 @@ const PERSONAS = [
     id: "relationship",
     label: "Relationship-led banker",
     guidance:
-      "Start with a clear answer in natural spoken language. Show interest in the client's underlying exposure and end with a practical question about what they are trying to manage."
+      "Give a simple, credible initial perspective using only the market detail needed to be useful. Bridge warmly to the client's situation and end with a broad, genuinely curious question about why the issue matters to them. Do not turn the question into an exposure checklist."
   },
   {
     id: "commercial",
     label: "Commercial planning partner",
     guidance:
-      "Frame the base case and the most relevant alternative. Translate the outlook into a planning consideration such as timing, cash flow, cost, certainty or flexibility."
+      "Translate the outlook into one or two concrete planning considerations such as timing, costs, cash flow, liquidity, procurement or operational flexibility. End by exploring the decision or planning horizon affected. Avoid sounding like a formal strategy paper."
   },
   {
     id: "risk",
     label: "Risk-aware specialist",
     guidance:
-      "Give a usable view while making the key uncertainty and trigger points clear. Connect the answer to the client's decision horizon and tolerance for adverse movement."
+      "State the base case, then identify the most important trigger that would make the outcome materially better or worse. Connect this to the client's decision date, resilience or tolerance for adverse movement. Use plain language and avoid listing every possible risk."
   }
 ];
 
@@ -37,7 +37,7 @@ const VIEW_ANSWER_SCHEMA = {
         properties: {
           personaId: { type: "string", enum: PERSONAS.map(({ id }) => id) },
           responseBody: { type: "string" },
-          shorterLiveVersion: { type: "string" },
+          shorterLiveBody: { type: "string" },
           view: { type: "string" },
           influences: { type: "string" },
           effects: { type: "string" },
@@ -48,7 +48,7 @@ const VIEW_ANSWER_SCHEMA = {
         required: [
           "personaId",
           "responseBody",
-          "shorterLiveVersion",
+          "shorterLiveBody",
           "view",
           "influences",
           "effects",
@@ -149,7 +149,9 @@ async function createMarketContext({
         role: "system",
         content: `Prepare a compact, source-based market context for a banker answering a client question.
 
-Use current, authoritative sources. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.`
+Use current, authoritative sources. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
+
+Return clean prose only in the structured fields. Do not include citations, publisher names, domains, URLs, markdown links, footnotes or source markers in assumption, baseline, observed or watch. Sources are collected separately by the application.`
       },
       {
         role: "user",
@@ -163,9 +165,9 @@ As of: ${asOf}
 
 Return four short fields:
 - assumption: one sentence or an empty string
-- baseline: the likely direction and horizon, no more than 55 words
-- observed: the most relevant current facts, no more than 65 words
-- watch: one or two developments that could change the view, no more than 45 words
+- baseline: the likely direction and horizon, no more than 45 words
+- observed: the two most relevant current facts, no more than 50 words
+- watch: one or two developments that could change the view, no more than 40 words
 
 Check the direction of causal claims and describe opposing forces separately.`
       }
@@ -178,10 +180,10 @@ Check the direction of causal claims and describe opposing forces separately.`
   const parsed = parseJsonOutput(response, "market context");
 
   return {
-    assumption: cleanSpeech(parsed.assumption),
-    baseline: cleanSpeech(parsed.baseline),
-    observed: cleanSpeech(parsed.observed),
-    watch: cleanSpeech(parsed.watch),
+    assumption: sanitiseMarketProse(parsed.assumption),
+    baseline: sanitiseMarketProse(parsed.baseline),
+    observed: sanitiseMarketProse(parsed.observed),
+    watch: sanitiseMarketProse(parsed.watch),
     asOf,
     sources: extractSources(response),
     caution:
@@ -241,8 +243,8 @@ Create exactly one answer for each banker persona, in this order:
 ${personaInstructions}
 
 For each persona:
-- responseBody: a complete natural spoken response of about 90–150 words. It must answer the client first, include a natural bridge, and end with the clientQuestion.
-- shorterLiveVersion: a 45–75 word spoken version retaining the baseline, main uncertainty, one implication, bridge and open question.
+- responseBody: 90–130 words containing the baseline view, main uncertainty, practical implications and a natural bridge. Do not include the final client question.
+- shorterLiveBody: 35–60 words containing the baseline, main uncertainty, one implication and a short bridge. Do not include the final client question.
 - view: a brief explanation of the baseline view.
 - influences: the one or two factors most likely to change the view.
 - effects: practical implications relevant to the likely client decision.
@@ -251,7 +253,8 @@ For each persona:
 - verificationNeeded: identify current facts, technical details or specialist input to check, or “None”.
 
 Shared quality requirements:
-- Do not start responseBody or shorterLiveVersion with a question.
+- Do not start responseBody or shorterLiveBody with a question.
+- Do not place any question in responseBody or shorterLiveBody; clientQuestion is the single final question and the application will append it once.
 - Do not bury the baseline beneath caveats.
 - Mention only material uncertainties; do not list every scenario.
 - State a material assumption lightly in the response only when necessary.
@@ -260,7 +263,8 @@ Shared quality requirements:
 - Do not silently assume a market, currency, country or central bank.
 - Do not mention VIEW, the model, the prompt, the source brief or the analysis.
 - Do not include markdown, citations, URLs or unsupported figures.
-- The three answers must differ in banker perspective and emphasis, not merely in confidence, wording or length.
+- The three answers must differ in banker purpose and emphasis, not merely in confidence, wording or length.
+- Each persona may emphasise different parts of the shared analysis; do not force every answer to repeat every fact, risk and implication.
 - The short VIEW fields should explain the structure rather than repeat the response verbatim.`
       }
     ],
@@ -299,9 +303,9 @@ function normaliseAnswers(answers, question, clientContext) {
     return {
       personaId: persona.id,
       label: persona.label,
-      response: ensureEndsWithQuestion(body, clientQuestion),
-      shorterLiveVersion: ensureEndsWithQuestion(
-        cleanSpeech(answer.shorterLiveVersion),
+      response: assembleResponse(body, clientQuestion),
+      shorterLiveVersion: assembleResponse(
+        cleanSpeech(answer.shorterLiveBody),
         clientQuestion
       ),
       view: cleanSpeech(answer.view),
@@ -314,17 +318,31 @@ function normaliseAnswers(answers, question, clientContext) {
   });
 }
 
-function ensureEndsWithQuestion(body, clientQuestion) {
-  const cleanBody = cleanSpeech(body).replace(/[.!]+$/, "");
+function assembleResponse(body, clientQuestion) {
+  const cleanBody = cleanSpeech(stripTrailingQuestion(body));
   if (!cleanBody) return clientQuestion;
 
-  const bodyKey = comparisonKey(cleanBody);
-  const questionKey = comparisonKey(clientQuestion);
-  if (questionKey && bodyKey.endsWith(questionKey)) {
-    return `${cleanBody}?`;
-  }
+  const punctuation = /[.!]$/.test(cleanBody) ? "" : ".";
+  return `${cleanBody}${punctuation} ${clientQuestion}`.replace(/\s+/g, " ").trim();
+}
 
-  return `${cleanBody}. ${clientQuestion}`.trim();
+function stripTrailingQuestion(value) {
+  const text = clean(value, 1800).trim();
+  if (!text) return "";
+
+  // Structured output should not contain a question here. If the model adds
+  // one anyway, remove the final question before appending clientQuestion once.
+  if (!text.endsWith("?")) return text;
+
+  const sentenceBoundary = Math.max(
+    text.lastIndexOf(". "),
+    text.lastIndexOf("! "),
+    text.lastIndexOf("? ", text.length - 2)
+  );
+
+  return sentenceBoundary >= 0
+    ? text.slice(0, sentenceBoundary + 1).trim()
+    : "";
 }
 
 function topicSpecificFallbacks(question, clientContext) {
@@ -396,6 +414,28 @@ function parseJsonOutput(response, description) {
     };
     throw error;
   }
+}
+
+function sanitiseMarketProse(value) {
+  return clean(value, 2200)
+    // Remove markdown-style links, including spaces between ] and (.
+    .replace(/\[([^\]]+)\]\s*\(\s*https?:\/\/[^)]+\)/gi, "")
+    // Remove combined citation clusters such as ([publisher.com] (https://...)).
+    .replace(/\(\s*\[[^\]]+\]\s*\(\s*https?:\/\/[^)]+\)\s*\)/gi, "")
+    // Remove parenthesised and bare URLs that still remain.
+    .replace(/\(\s*https?:\/\/[^)]+\)/gi, "")
+    .replace(/https?:\/\/[^\s)]+/gi, "")
+    // Remove leaked publisher/domain markers and simple footnote markers.
+    .replace(/\[\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\]/gi, "")
+    .replace(/\(\s*(?:www\.)?[a-z0-9.-]+\.(?:com|org|net|gov|edu|co|io)\s*\)/gi, "")
+    .replace(/\[\s*(?:source|sources|citation|\d+)\s*\]/gi, "")
+    // Tidy punctuation left behind by removed citations.
+    .replace(/\(\s*\)/g, "")
+    .replace(/\[\s*\]/g, "")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([.!?])\1+/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cleanSpeech(value) {
