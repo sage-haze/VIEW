@@ -1,11 +1,18 @@
 const form = document.querySelector("#viewForm");
 const questionInput = document.querySelector("#question");
+const regionInput = document.querySelector("#marketRegion");
 const contextInput = document.querySelector("#clientContext");
 const marketToggle = document.querySelector("#useMarketContext");
 const submitButton = document.querySelector("#submitButton");
 const statusBox = document.querySelector("#status");
 const marketBox = document.querySelector("#marketContext");
 const answersBox = document.querySelector("#answers");
+
+const ANSWER_LABELS = [
+  "Concise and direct",
+  "Balanced and consultative",
+  "Cautious under uncertainty"
+];
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -16,20 +23,19 @@ form.addEventListener("submit", async (event) => {
   setLoading(true);
   statusBox.className = "status";
   statusBox.textContent = marketToggle.checked
-    ? "Reviewing current context and generating responses…"
-    : "Generating responses…";
+    ? "Checking current context and preparing three client-ready responses…"
+    : "Preparing three client-ready responses…";
   marketBox.classList.add("hidden");
   marketBox.innerHTML = "";
   answersBox.innerHTML = "";
 
   try {
-    // Relative URL: the browser calls the Pages Function on the same
-    // Cloudflare Pages deployment. No external Worker URL or CORS is needed.
     const response = await fetch("/api/view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         question,
+        marketRegion: regionInput.value.trim(),
         clientContext: contextInput.value.trim(),
         useMarketContext: marketToggle.checked
       })
@@ -46,7 +52,7 @@ form.addEventListener("submit", async (event) => {
 
     renderMarketContext(data.marketContext);
     renderAnswers(data.answers);
-    statusBox.textContent = `Generated using ${data.models.answer}.`;
+    statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
   } catch (error) {
     console.error(error);
     statusBox.className = "status error";
@@ -62,23 +68,51 @@ function setLoading(loading) {
 }
 
 function renderMarketContext(context) {
-  if (!context?.summary) return;
+  if (!context?.baseline) return;
 
   const sources = Array.isArray(context.sources) ? context.sources : [];
+  const sourceSection = sources.length
+    ? `<details class="source-details">
+        <summary>Sources used (${sources.length})</summary>
+        <ul class="sources">
+          ${sources.map((source) => `
+            <li>
+              <a href="${escapeAttribute(source.url)}" target="_blank" rel="noopener noreferrer">
+                ${escapeHtml(source.title || "Source")}
+              </a>
+            </li>`).join("")}
+        </ul>
+      </details>`
+    : "";
+
   marketBox.innerHTML = `
-    <h2>Current source-based context</h2>
-    <p>${escapeHtml(context.summary)}</p>
-    ${sources.length ? `
-      <h3>Sources</h3>
-      <ul class="sources">
-        ${sources.map(source => `
-          <li><a href="${escapeAttribute(source.url)}" target="_blank" rel="noopener noreferrer">
-            ${escapeHtml(source.title || source.url)}
-          </a></li>`).join("")}
-      </ul>` : ""}
-    <small>${escapeHtml(context.caution || "")}</small>
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Current context</p>
+        <h2>Source-based market brief</h2>
+      </div>
+      ${context.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
+    </div>
+
+    ${context.assumption ? `
+      <div class="assumption"><strong>Assumption</strong>${escapeHtml(context.assumption)}</div>
+    ` : ""}
+
+    <div class="context-grid">
+      ${contextPart("Baseline", context.baseline)}
+      ${contextPart("Observed facts", context.observed)}
+      ${contextPart("What could change", context.watch)}
+    </div>
+
+    ${sourceSection}
+    <p class="caution">${escapeHtml(context.caution || "")}</p>
   `;
   marketBox.classList.remove("hidden");
+}
+
+function contextPart(title, text) {
+  if (!text) return "";
+  return `<div class="context-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`;
 }
 
 function renderAnswers(answers) {
@@ -88,24 +122,59 @@ function renderAnswers(answers) {
 
   answersBox.innerHTML = answers.map((answer, index) => `
     <article class="panel answer">
-      <h2>${index + 1}. ${escapeHtml(answer.label)}</h2>
-      <p class="response">${escapeHtml(answer.response)}</p>
+      <div class="answer-heading">
+        <span class="answer-number">${index + 1}</span>
+        <h2>${escapeHtml(ANSWER_LABELS[index])}</h2>
+      </div>
+      <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
       <div class="view-grid">
         ${viewPart("V — View", answer.view)}
         ${viewPart("I — Influences", answer.influences)}
         ${viewPart("E — Effects", answer.effects)}
-        ${viewPart("W — What matters", answer.whatMatters)}
+        ${viewPart("W — Client question", answer.whatMatters)}
       </div>
+      <button class="copy-button" type="button" data-copy="${escapeAttribute(answer.response)}">Copy response</button>
     </article>
   `).join("");
+
+  for (const button of answersBox.querySelectorAll(".copy-button")) {
+    button.addEventListener("click", () => copyResponse(button));
+  }
+}
+
+async function copyResponse(button) {
+  const text = button.dataset.copy || "";
+  const original = button.textContent;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = "Copied";
+  } catch {
+    button.textContent = "Copy failed";
+  }
+
+  window.setTimeout(() => {
+    button.textContent = original;
+  }, 1500);
 }
 
 function viewPart(title, text) {
-  return `<div class="view-part"><strong>${escapeHtml(title)}</strong>${escapeHtml(text || "")}</div>`;
+  return `<div class="view-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text || "")}</p></div>`;
+}
+
+function formatDate(value) {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(date);
 }
 
 function escapeHtml(value = "") {
-  return String(value).replace(/[&<>"']/g, character => ({
+  return String(value).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;",
     '"': "&quot;", "'": "&#039;"
   })[character]);

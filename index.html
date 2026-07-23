@@ -8,10 +8,10 @@
 </head>
 <body>
   <main class="container">
-    <header class="panel">
+    <header class="panel hero">
       <p class="kicker">VIEW Conversation Coach</p>
-      <h1>Create three balanced client responses</h1>
-      <p>Enter a client question. The coach will produce three answers built around View, Influences, Effects, and What matters to the client.</p>
+      <h1>Create balanced, client-ready responses</h1>
+      <p>Turn a broad market question into three natural responses built around View, Influences, Effects, and what matters to the client.</p>
     </header>
 
     <form id="viewForm" class="panel">
@@ -19,9 +19,20 @@
       <textarea id="question" maxlength="1500" required
         placeholder="Do you think interest rates will fall soon?"></textarea>
 
-      <label for="clientContext">Client context <span>(optional)</span></label>
-      <textarea id="clientContext" maxlength="1000"
-        placeholder="The client is considering financing a new factory."></textarea>
+      <div class="form-row">
+        <div>
+          <label for="marketRegion">Market or region <span>(optional)</span></label>
+          <input id="marketRegion" maxlength="120"
+            placeholder="e.g. United States, Singapore, United Kingdom">
+          <small>Useful for rates, currencies, regulation, and market outlooks.</small>
+        </div>
+
+        <div>
+          <label for="clientContext">Client context <span>(optional)</span></label>
+          <textarea id="clientContext" class="compact" maxlength="1000"
+            placeholder="e.g. The client is refinancing a facility in six months."></textarea>
+        </div>
+      </div>
 
       <label class="checkbox">
         <input id="useMarketContext" type="checkbox" checked>
@@ -31,8 +42,8 @@
         </span>
       </label>
 
-      <button id="submitButton" type="submit">Generate three responses</button>
-          <p class="diagnostic-link">
+      <button id="submitButton" class="primary-button" type="submit">Generate three responses</button>
+      <p class="diagnostic-link">
         Having trouble? <a href="/api/test" target="_blank" rel="noopener noreferrer">Test the API key binding</a>
       </p>
     </form>
@@ -42,7 +53,7 @@
     <section id="answers" class="answers" aria-live="polite"></section>
 
     <footer>
-      Do not enter confidential client information. Verify time-sensitive market information before using it with a client.
+      Do not enter confidential client information. Verify time-sensitive information before using it with a client.
     </footer>
   </main>
 

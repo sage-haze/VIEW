@@ -8,8 +8,8 @@ export async function onRequestGet(context) {
       branch: env.CF_PAGES_BRANCH || null,
       bindings: {
         openAIKeyConfigured: Boolean(env.OPENAI_API_KEY),
-        answerModel: env.OPENAI_ANSWER_MODEL || "gpt-5-mini",
-        analysisModel: env.OPENAI_ANALYSIS_MODEL || "gpt-5"
+        answerModel: env.OPENAI_ANSWER_MODEL || "gpt-5.6-terra",
+        analysisModel: env.OPENAI_ANALYSIS_MODEL || "gpt-5.4-mini"
       }
     },
     {
