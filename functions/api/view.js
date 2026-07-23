@@ -231,28 +231,23 @@ Create exactly three distinct answers in this order:
 1. Concise and direct
 - Response body: 40–65 words.
 - Lead with a direct answer.
-- Use no more than one qualifying phrase.
 - Make it sound easy to say aloud.
-- Client question: ask about the concrete action or exposure behind the question, using topic-relevant choices where possible.
 
 2. Balanced and consultative
 - Response body: 75–110 words.
 - Explain the baseline and the main alternative scenario.
 - Include one practical planning implication, but do not recommend a specific transaction when client context is missing.
-- Client question: ask which practical dimension matters most, such as timing, cost, certainty, liquidity, exposure or flexibility, tailored to the topic.
+
 
 3. Cautious under uncertainty
 - Response body: 65–100 words.
 - Be explicit about what is uncertain and why exact timing cannot be known.
 - Still give a usable baseline rather than avoiding the question.
-- Client question: ask about the client's decision horizon and their ability to accommodate the relevant uncertainty or volatility.
 
 Requirements for every answer:
 - If the question uses an imprecise timeframe such as “soon”, briefly define a sensible horizon, for example “over the next few months”.
 - Do not silently assume a country, currency or central bank. Use the supplied market/region or state the necessary market assumption naturally in a few words.
 - The responseBody must contain no questions and no question marks.
-- The clientQuestion must be exactly one short question, ending in a question mark, that invites the client to share more. It may include relevant choices, but should leave room for another concern.
-- Each clientQuestion must be distinct, relevant to the discussion and useful for a real follow-up conversation.
 - Do not use the generic phrase “What decision is behind your question?”
 - Do not repeat the same wording or sentence structure across the three answers.
 - Do not mention VIEW or announce its letters in the responseBody.
