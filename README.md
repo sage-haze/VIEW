@@ -76,9 +76,9 @@ This version also:
 
 ## Conversational relevance calibration
 
-The response prompt does not assume every client question is connected to a business need. It treats the question as potentially light conversation or general curiosity, uses conditional language for possible commercial relevance, and gives the client room to say whether there is a specific angle behind the question.
+The response prompt takes the client’s question at face value while allowing that there may be a personal, business or financial reason behind it. The final question now makes a gentle, topic-specific relevance link without claiming to know the client’s exact objective or pushing towards a transaction.
 
 
-## v5 response style
+## v6 response style
 
 This version generates one friendly response for a junior banker with roughly one to two years of experience. It takes the client question at face value, avoids assuming a commercial need or market position, uses plain English, and avoids language that could sound corrective.
