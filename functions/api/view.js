@@ -207,8 +207,8 @@ async function createViewAnswers({
 VIEW means:
 V — Give a clear but appropriately cautious baseline view.
 I — Identify the main influences that could change the view.
-E — Explain the potential practical implication for the client's decision; do not merely repeat the forecast.
-W — Lead the discussion to what might matter to the client with a bridging sentence, followed by an open-ended question inviting input from the client. The question should be sufficiently tentative and broad to cater for areas of potential client interest which we might not be aware of, while demonstrating interest and desire to support by the banker.
+E — Explain one or two potential practical implications for the client. Present these as possibilities to explore rather than assume they apply, and do not merely repeat the forecast.
+W — Lead the discussion towards what may matter to the client with a bridging sentence, followed by a guided open question inviting their perspective. Where helpful, offer two or three relevant dimensions while leaving room for the client to raise another concern. The question should be tentative, broad enough to accommodate areas of interest we may not be aware of, and demonstrate the banker’s interest and desire to support.
 
 Write for a banker speaking naturally to a client. Prefer short, clear sentences and ordinary spoken language. Avoid academic wording, market-note language, jargon, product pitching and internal process language. Never pretend to predict with certainty. Do not recommend a transaction before the client's objective and constraints are understood.`
       },
@@ -251,7 +251,7 @@ Requirements for every answer:
 - If the question uses an imprecise timeframe such as “soon”, briefly define a sensible horizon, for example “over the next few months”.
 - Do not silently assume a country, currency or central bank. Use the supplied market/region or state the necessary market assumption naturally in a few words.
 - The responseBody must contain no questions and no question marks.
-- The clientQuestion must be exactly one short, question ending in a question mark to invite the client to share more.
+- The clientQuestion must be exactly one short question, ending in a question mark, that invites the client to share more. It may include relevant choices, but should leave room for another concern.
 - Each clientQuestion must be distinct, relevant to the discussion and useful for a real follow-up conversation.
 - Do not use the generic phrase “What decision is behind your question?”
 - Do not repeat the same wording or sentence structure across the three answers.
