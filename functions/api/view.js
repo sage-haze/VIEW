@@ -208,7 +208,7 @@ VIEW means:
 V — Give a clear but appropriately cautious baseline view.
 I — Identify the main influences that could change the view.
 E — Explain the potential practical implication for the client's decision; do not merely repeat the forecast.
-W — Connect the discussion to what matters to the client with a bridging sentence to introduce the link, followed by one direct, topic-specific question.
+W — Connect the discussion to what might matter to the client with a bridging sentence to bring it closer to them, followed by an open-ended question inviting input from the client while demonstrating interest by the banker.
 
 Write for a banker speaking naturally to a client. Prefer short, clear sentences and ordinary spoken language. Avoid academic wording, market-note language, jargon, product pitching and internal process language. Never pretend to predict with certainty. Do not recommend a transaction before the client's objective and constraints are understood.`
       },
