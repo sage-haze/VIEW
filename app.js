@@ -102,17 +102,23 @@ function renderMarketContext(context) {
 function renderSources(sources) {
   if (!sources.length) return "";
 
-  return `<details class="source-details">
-    <summary>Sources used (${sources.length})</summary>
-    <ul class="sources">
-      ${sources.map(({ url, title }) => `
-        <li>
-          <a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
-            ${escapeHtml(title || "Source")}
-          </a>
-        </li>`).join("")}
-    </ul>
-  </details>`;
+  const links = sources.map(({ url, title }, index) => {
+    const label = title || `Source ${index + 1}`;
+    return `<a
+      class="source-chip"
+      href="${escapeAttribute(url)}"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="${escapeAttribute(label)}"
+      aria-label="Source ${index + 1}: ${escapeAttribute(label)}"
+    >${index + 1}</a>`;
+  }).join("");
+
+  return `<div class="source-strip" aria-label="Sources used">
+    <span class="source-strip-label">Sources</span>
+    <span class="source-chips">${links}</span>
+    <span class="source-hint">Hover or focus to view each title</span>
+  </div>`;
 }
 
 function contextPart(title, text) {

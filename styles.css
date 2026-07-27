@@ -178,11 +178,38 @@ button:disabled { opacity: .65; cursor: progress; }
 .context-part strong { display: block; color: #243f9d; }
 .context-part p { margin: 6px 0 0; }
 
-.source-details { margin-top: 16px; }
-.source-details summary { cursor: pointer; font-weight: 750; }
-.sources { margin-bottom: 0; padding-left: 1.3rem; }
-.sources li { margin: .45rem 0; }
-.sources a { overflow-wrap: anywhere; }
+.source-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  color: #566178;
+  font-size: .86rem;
+}
+
+.source-strip-label { font-weight: 750; color: #17233f; }
+.source-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #bdc9e4;
+  border-radius: 999px;
+  background: #f7f9ff;
+  color: #2443a6;
+  font-weight: 800;
+  text-decoration: none;
+}
+.source-chip:hover,
+.source-chip:focus-visible {
+  background: #eaf0ff;
+  border-color: #2443a6;
+  outline: none;
+}
+.source-hint { font-size: .78rem; color: #70798b; }
 .caution { margin: 16px 0 0; color: #657086; font-size: .82rem; }
 
 .diagnostic-link { margin: .3rem 0 0; font-size: .9rem; text-align: center; }
