@@ -119,7 +119,11 @@ async function createMarketContext({
         role: "system",
         content: `Prepare a compact, source-based market context for a banker answering a client question.
 
-Use current, authoritative sources. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
+Use current, authoritative sources. Strongly prioritise official institutions, central banks, regulators, recognised international organisations, and reputable financial or general-news publishers with direct reporting. Use at least two independent high-quality sources whenever the topic permits. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
+
+Where the question concerns a clearly defined future event, you may consult reputable event or prediction markets only as a quiet secondary background signal. Use that signal solely to corroborate or challenge conclusions already supported by stronger evidence from official data, conventional financial-market pricing, professional surveys and reputable reporting. Never let it determine the baseline, supply an observed fact, or replace a reputable supporting source. Treat any implied probability as a rough participant expectation, not a fact, forecast, recommendation or definitive consensus. Ignore thin, stale, ambiguous or poorly matched contracts.
+
+Do not mention bookmakers, betting, wagers, odds, strong bets, event markets or prediction markets in the four prose fields. Do not rely on them for any claim unless the same direction is independently supported by reputable sources. Translate any useful background signal into restrained language only when it materially improves the synthesis.
 
 Return clean prose only in the structured fields. Do not include citations, publisher names, domains, URLs, markdown links, footnotes or source markers in assumption, baseline, observed or watch. Sources are collected separately by the application.`
       },
@@ -139,7 +143,7 @@ Return four short fields:
 - observed: the two most relevant current facts, no more than 50 words
 - watch: one or two developments that could change the view, no more than 40 words
 
-Check the direction of causal claims and describe opposing forces separately.`
+Check the direction of causal claims and describe opposing forces separately. Ground the observed field primarily in official releases and reputable reporting. If a clearly defined event has relevant event-market pricing, use it only as quiet corroboration in the background after the conclusion is already supported by stronger sources. Do not foreground it, quote odds or probabilities, describe the outcome as a strong bet or market consensus, or depend on it for any observation.`
       }
     ],
     text: jsonFormat("market_context", MARKET_CONTEXT_SCHEMA),
@@ -201,7 +205,8 @@ Conversation rules:
 - Avoid phrases such as “your base case”, “you may be assuming”, “rather than treating”, “you should allow for”, “the prudent approach”, or anything that sounds corrective or advisory.
 - Do not sound like a strategist, economist, research note or official house view.
 - Keep the tone warm, modest, natural and easy to say aloud.
-- Do not invent facts, forecasts, figures or institutional views.`
+- Do not invent facts, forecasts, figures or institutional views.
+- If the source-based context was partly informed by event-market pricing, do not mention that mechanism, odds, bets or implied probabilities in the spoken response unless the client specifically asks about the source.`
       },
       {
         role: "user",
@@ -506,7 +511,62 @@ function extractSources(response) {
     }
   }
 
-  return [...sources.values()].slice(0, 5);
+  return [...sources.values()]
+    .filter((source) => !isEventMarketSource(source))
+    .sort((a, b) => sourcePriority(b) - sourcePriority(a))
+    .slice(0, 5);
+}
+
+function isEventMarketSource({ url, title }) {
+  const text = `${url} ${title}`.toLowerCase();
+  return [
+    "polymarket",
+    "kalshi",
+    "predictit",
+    "betfair",
+    "manifold.markets",
+    "metaculus",
+    "smarkets",
+    "betting odds",
+    "prediction market",
+    "event market"
+  ].some((term) => text.includes(term));
+}
+
+function sourcePriority({ url }) {
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return 0;
+  }
+
+  const officialPatterns = [
+    ".gov", ".gov.uk", ".europa.eu", "imf.org", "worldbank.org",
+    "bis.org", "oecd.org", "un.org", "ecb.europa.eu", "federalreserve.gov",
+    "bankofengland.co.uk", "mas.gov.sg"
+  ];
+  if (officialPatterns.some((pattern) => hostname.endsWith(pattern) || hostname.includes(pattern))) {
+    return 4;
+  }
+
+  const topNews = [
+    "reuters.com", "bloomberg.com", "ft.com", "wsj.com", "apnews.com",
+    "bbc.com", "bbc.co.uk", "cnbc.com", "economist.com", "nikkei.com"
+  ];
+  if (topNews.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) {
+    return 3;
+  }
+
+  const establishedSources = [
+    "spglobal.com", "moodys.com", "fitchratings.com", "morningstar.com",
+    "marketwatch.com", "investing.com", "tradingeconomics.com"
+  ];
+  if (establishedSources.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) {
+    return 2;
+  }
+
+  return 1;
 }
 
 function addSource(map, rawUrl, rawTitle) {

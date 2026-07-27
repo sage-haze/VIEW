@@ -82,3 +82,8 @@ The response prompt takes the client’s question at face value while allowing t
 ## v6 response style
 
 This version generates one friendly response for a junior banker with roughly one to two years of experience. It takes the client question at face value, avoids assuming a commercial need or market position, uses plain English, and avoids language that could sound corrective.
+
+
+## v7 background expectation signals
+
+For questions about clearly defined future events, the source-based analysis may consult reputable event or prediction markets as a quiet secondary signal. The signal is never allowed to determine the baseline on its own, is ignored when the contract is thin or poorly matched, and is not described to the client as a bet, odds, or definitive consensus. Any such platform may still appear transparently in the expandable **Sources used** list.
