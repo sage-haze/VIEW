@@ -117,7 +117,6 @@ function renderSources(sources) {
   return `<div class="source-strip" aria-label="Sources used">
     <span class="source-strip-label">Sources</span>
     <span class="source-chips">${links}</span>
-    <span class="source-hint">Hover or focus to view each title</span>
   </div>`;
 }
 
@@ -135,7 +134,6 @@ function renderAnswer(answer) {
   answersBox.innerHTML = `
     <article class="panel answer">
       <div class="answer-heading">
-        <span class="answer-number">1</span>
         <h2>${escapeHtml(answer.label || "Suggested response")}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>

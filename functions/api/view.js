@@ -119,7 +119,11 @@ async function createMarketContext({
         role: "system",
         content: `Prepare a compact, source-based market context for a banker answering a client question.
 
-Use current, authoritative sources. Strongly prioritise official institutions, central banks, regulators, recognised international organisations, and reputable financial or general-news publishers with direct reporting. Use at least two independent high-quality sources whenever the topic permits. Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
+Use current, authoritative sources. Start with sources from the country, market or region named in the question. Strongly prioritise the relevant local central bank, regulator, government statistical agency, official benchmark administrator and reputable local or regional reporting. Use global institutions and overseas central banks only for genuinely relevant external drivers, not as substitutes for local evidence.
+
+Aim for source diversity: use at least two independent high-quality publishers or institutions whenever the topic permits, and avoid relying on several pages from the same domain. When a jurisdiction is explicit, most supporting sources should directly cover that jurisdiction. For example, for Singapore mortgages or Singapore-dollar rates, prioritise MAS, Singapore government or benchmark sources, the Association of Banks in Singapore, and reputable Singapore or Asia-focused reporting; Federal Reserve material may support the global-rate backdrop but should not dominate the evidence.
+
+Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
 
 Where the question concerns a clearly defined future event, you may consult reputable event or prediction markets only as a quiet secondary background signal. Use that signal solely to corroborate or challenge conclusions already supported by stronger evidence from official data, conventional financial-market pricing, professional surveys and reputable reporting. Never let it determine the baseline, supply an observed fact, or replace a reputable supporting source. Treat any implied probability as a rough participant expectation, not a fact, forecast, recommendation or definitive consensus. Ignore thin, stale, ambiguous or poorly matched contracts.
 
@@ -143,7 +147,7 @@ Return four short fields:
 - observed: the two most relevant current facts, no more than 50 words
 - watch: one or two developments that could change the view, no more than 40 words
 
-Check the direction of causal claims and describe opposing forces separately. Ground the observed field primarily in official releases and reputable reporting. If a clearly defined event has relevant event-market pricing, use it only as quiet corroboration in the background after the conclusion is already supported by stronger sources. Do not foreground it, quote odds or probabilities, describe the outcome as a strong bet or market consensus, or depend on it for any observation.`
+Check the direction of causal claims and describe opposing forces separately. Ground the observed field primarily in local official releases and reputable local or regional reporting, supplemented by global sources only where they directly explain an external driver. Search for evidence that matches the named jurisdiction and topic rather than defaulting to United States sources. If a clearly defined event has relevant event-market pricing, use it only as quiet corroboration in the background after the conclusion is already supported by stronger sources. Do not foreground it, quote odds or probabilities, describe the outcome as a strong bet or market consensus, or depend on it for any observation.`
       }
     ],
     text: jsonFormat("market_context", MARKET_CONTEXT_SCHEMA),
@@ -159,7 +163,7 @@ Check the direction of causal claims and describe opposing forces separately. Gr
     observed: sanitiseMarketProse(parsed.observed),
     watch: sanitiseMarketProse(parsed.watch),
     asOf,
-    sources: extractSources(response),
+    sources: extractSources(response, { question, marketRegion }),
     caution:
       "This is a time-sensitive synthesis, not a guaranteed forecast or personalised advice."
   };
@@ -490,7 +494,7 @@ function outputText(response) {
   throw error;
 }
 
-function extractSources(response) {
+function extractSources(response, { question = "", marketRegion = "" } = {}) {
   const sources = new Map();
 
   for (const item of response.output || []) {
@@ -511,10 +515,99 @@ function extractSources(response) {
     }
   }
 
-  return [...sources.values()]
+  const context = `${question} ${marketRegion}`.toLowerCase();
+  const ranked = [...sources.values()]
     .filter((source) => !isEventMarketSource(source))
-    .sort((a, b) => sourcePriority(b) - sourcePriority(a))
-    .slice(0, 5);
+    .map((source) => ({
+      ...source,
+      hostname: sourceHostname(source.url),
+      score: sourcePriority(source) + regionalSourceBoost(source, context)
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  // Prefer distinct publishers and institutions before using a second page
+  // from the same domain. This avoids a visible list of five near-identical
+  // links while still allowing a second highly relevant primary source.
+  const selected = [];
+  const hostCounts = new Map();
+
+  for (const source of ranked) {
+    if (!source.hostname || hostCounts.has(source.hostname)) continue;
+    selected.push(source);
+    hostCounts.set(source.hostname, 1);
+    if (selected.length === 5) break;
+  }
+
+  if (selected.length < 5) {
+    for (const source of ranked) {
+      if (selected.some((item) => item.url === source.url)) continue;
+      const count = hostCounts.get(source.hostname) || 0;
+      if (count >= 2) continue;
+      selected.push(source);
+      hostCounts.set(source.hostname, count + 1);
+      if (selected.length === 5) break;
+    }
+  }
+
+  return selected.map(({ title, url }) => ({ title, url }));
+}
+
+function sourceHostname(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function regionalSourceBoost({ url, title }, context) {
+  const hostname = sourceHostname(url);
+  const text = `${hostname} ${title || ""}`.toLowerCase();
+  let score = 0;
+
+  const regions = [
+    {
+      match: /\b(singapore|sgd|sora|mas|association of banks in singapore)\b/,
+      local: [
+        "mas.gov.sg", "moneysense.gov.sg", "singstat.gov.sg", "abs.org.sg",
+        "sora.org.sg", "channelnewsasia.com", "businesstimes.com.sg",
+        "straitstimes.com", "sgx.com"
+      ]
+    },
+    {
+      match: /\b(malaysia|myr|bank negara|bnm)\b/,
+      local: ["bnm.gov.my", "dosm.gov.my", "bernama.com", "theedgemalaysia.com"]
+    },
+    {
+      match: /\b(united kingdom|uk|sterling|gbp|bank of england)\b/,
+      local: ["bankofengland.co.uk", "ons.gov.uk", "gov.uk", "ft.com", "bbc.co.uk"]
+    },
+    {
+      match: /\b(euro area|eurozone|european union|eur|ecb)\b/,
+      local: ["ecb.europa.eu", "eurostat.ec.europa.eu", "europa.eu"]
+    },
+    {
+      match: /\b(united states|u\.s\.|usa|usd|federal reserve|fed)\b/,
+      local: ["federalreserve.gov", "bls.gov", "bea.gov", "treasury.gov"]
+    }
+  ];
+
+  for (const region of regions) {
+    if (!region.match.test(context)) continue;
+    if (region.local.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) {
+      score += 8;
+    } else if (text.includes(context.trim())) {
+      score += 1;
+    }
+  }
+
+  // Reputable global reporting remains useful, but local primary evidence
+  // should normally rank above it when a jurisdiction is specified.
+  if (/reuters\.com|bloomberg\.com|ft\.com|apnews\.com|bbc\./.test(hostname)) {
+    score += 1;
+  }
+
+  return score;
 }
 
 function isEventMarketSource({ url, title }) {
