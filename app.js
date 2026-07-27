@@ -1,226 +1,87 @@
-const form = document.querySelector("#viewForm");
-const questionInput = document.querySelector("#question");
-const regionInput = document.querySelector("#marketRegion");
-const contextInput = document.querySelector("#clientContext");
-const marketToggle = document.querySelector("#useMarketContext");
-const submitButton = document.querySelector("#submitButton");
-const statusBox = document.querySelector("#status");
-const marketBox = document.querySelector("#marketContext");
-const answersBox = document.querySelector("#answers");
+const setupForm = document.querySelector('#setupForm');
+const questionInput = document.querySelector('#question');
+const regionInput = document.querySelector('#marketRegion');
+const contextInput = document.querySelector('#clientContext');
+const marketToggle = document.querySelector('#useMarketContext');
+const startButton = document.querySelector('#startButton');
+const statusBox = document.querySelector('#status');
+const briefBox = document.querySelector('#brief');
+const workspace = document.querySelector('#workspace');
+const fieldsBox = document.querySelector('#viewFields');
+const reviewButton = document.querySelector('#reviewButton');
+const reviewBox = document.querySelector('#review');
 
-form.addEventListener("submit", async (event) => {
+let session = null;
+const components = [
+  ['view','V — Give a baseline view','What simple initial view would you give the client?'],
+  ['influences','I — Identify what may change it','What is the one most important factor that could change the picture?'],
+  ['effects','E — Explain possible relevance','What practical relevance could you mention without assuming too much?'],
+  ['whatMatters','W — Welcome what matters','What friendly question could gently explore how this may connect to the client?']
+];
+
+setupForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-
   const question = questionInput.value.trim();
   if (!question) return;
-
-  resetOutput();
-  setLoading(true);
-
-  statusBox.textContent = marketToggle.checked
-    ? "Checking current context and preparing a suggested response…"
-    : "Preparing a suggested response…";
-
+  setBusy(startButton, true, 'Preparing…');
+  statusBox.className = 'status';
+  statusBox.textContent = marketToggle.checked ? 'Checking current context and preparing guidance…' : 'Preparing guidance…';
+  briefBox.classList.add('hidden'); workspace.classList.add('hidden'); reviewBox.classList.add('hidden');
   try {
-    const response = await fetch("/api/view", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        marketRegion: regionInput.value.trim(),
-        clientContext: contextInput.value.trim(),
-        useMarketContext: marketToggle.checked
-      })
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      if (data.diagnostics) console.error("VIEW API diagnostics", data.diagnostics);
-      throw new Error(data.error || `Request failed (${response.status}).`);
-    }
-
-    renderMarketContext(data.marketContext);
-    renderAnswer(data.answer);
-    statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
-    answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (error) {
-    console.error(error);
-    statusBox.className = "status error";
-    statusBox.textContent = error.message || "Unable to generate responses.";
-  } finally {
-    setLoading(false);
-  }
+    const response = await fetch('/api/coach', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'start', question, marketRegion:regionInput.value.trim(), clientContext:contextInput.value.trim(), useMarketContext:marketToggle.checked }) });
+    const data = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+    session = data;
+    renderBrief(data.marketContext);
+    renderFields(data.guidance);
+    workspace.classList.remove('hidden');
+    statusBox.textContent = 'Ready. Write your own notes, then ask for feedback.';
+    workspace.scrollIntoView({behavior:'smooth',block:'start'});
+  } catch (error) { statusBox.className='status error'; statusBox.textContent=error.message; }
+  finally { setBusy(startButton,false,'Start guided practice'); }
 });
 
-function resetOutput() {
-  statusBox.className = "status";
-  marketBox.classList.add("hidden");
-  marketBox.innerHTML = "";
-  answersBox.innerHTML = "";
-}
+reviewButton.addEventListener('click', async () => {
+  if (!session) return;
+  const draft = Object.fromEntries(components.map(([key]) => [key, document.querySelector(`[data-field="${key}"]`).value.trim()]));
+  if (Object.values(draft).some(v => !v)) { statusBox.className='status error'; statusBox.textContent='Please attempt all four parts before requesting feedback.'; return; }
+  setBusy(reviewButton,true,'Reviewing…'); statusBox.className='status'; statusBox.textContent='Reviewing your reasoning and delivery…';
+  try {
+    const response = await fetch('/api/coach',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'review',question:session.question,marketRegion:session.marketRegion,clientContext:session.clientContext,marketContext:session.marketContext,draft})});
+    const data = await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+    renderReview(data);
+    statusBox.textContent='Review complete.';
+    reviewBox.scrollIntoView({behavior:'smooth',block:'start'});
+  } catch(error){statusBox.className='status error';statusBox.textContent=error.message;}
+  finally{setBusy(reviewButton,false,'Review my VIEW draft');}
+});
 
-function setLoading(loading) {
-  submitButton.disabled = loading;
-  submitButton.textContent = loading ? "Generating…" : "Generate suggested response";
-  form.setAttribute("aria-busy", String(loading));
-}
-
-function renderMarketContext(context) {
-  if (!context?.baseline) return;
-
-  const sources = Array.isArray(context.sources) ? context.sources : [];
-
-  marketBox.innerHTML = `
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Current context</p>
-        <h2>Source-based market brief</h2>
-      </div>
-      ${context.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
-    </div>
-
-    ${context.assumption ? `
-      <div class="assumption">
-        <strong>Assumption</strong>
-        <span>${escapeHtml(context.assumption)}</span>
-      </div>` : ""}
-
-    <div class="context-grid">
-      ${contextPart("Baseline", context.baseline)}
-      ${contextPart("Observed facts", context.observed)}
-      ${contextPart("What could change", context.watch)}
-    </div>
-
-    ${renderSources(sources)}
-    <p class="caution">${escapeHtml(context.caution || "")}</p>
-  `;
-
-  marketBox.classList.remove("hidden");
-}
-
-function renderSources(sources) {
-  if (!sources.length) return "";
-
-  const links = sources.map(({ url, title }, index) => {
-    const label = title || `Source ${index + 1}`;
-    return `<a
-      class="source-chip"
-      href="${escapeAttribute(url)}"
-      target="_blank"
-      rel="noopener noreferrer"
-      title="${escapeAttribute(label)}"
-      aria-label="Source ${index + 1}: ${escapeAttribute(label)}"
-    >${index + 1}</a>`;
-  }).join("");
-
-  return `<div class="source-strip" aria-label="Sources used">
-    <span class="source-strip-label">Sources</span>
-    <span class="source-chips">${links}</span>
-  </div>`;
-}
-
-function contextPart(title, text) {
-  return text
-    ? `<div class="context-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`
-    : "";
-}
-
-function renderAnswer(answer) {
-  if (!answer?.response) {
-    throw new Error("The API did not return a valid response.");
-  }
-
-  answersBox.innerHTML = `
-    <article class="panel answer">
-      <div class="answer-heading">
-        <h2>${escapeHtml(answer.label || "One possible VIEW response")}</h2>
-      </div>
-      <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
-      <div class="translation-actions">
-        <button class="translate-button" type="button" data-translate-to-thai>Translate to Thai</button>
-      </div>
-      <div class="thai-translation hidden" data-thai-translation lang="th" aria-live="polite"></div>
-      <div class="view-grid">
-        ${viewPart("V — Baseline view", answer.view)}
-        ${viewPart("I — What may change it", answer.influences)}
-        ${viewPart("E — Why it may matter", answer.effects)}
-        ${viewPart("W — Friendly follow-up", answer.whatMatters)}
-      </div>
-      <details class="coach-details">
-        <summary>Coaching notes and shorter version</summary>
-        <div class="coach-content">
-          ${viewPart("Shorter live version", answer.shorterLiveVersion)}
-          ${viewPart("Assumptions made", answer.assumptionsMade)}
-          ${viewPart("What should be verified", answer.verificationNeeded)}
-        </div>
-      </details>
-    </article>
-  `;
-
-  const translateButton = answersBox.querySelector("[data-translate-to-thai]");
-  const translationBox = answersBox.querySelector("[data-thai-translation]");
-  translateButton?.addEventListener("click", () => translateToThai({
-    button: translateButton,
-    output: translationBox,
-    text: answer.response
+function renderFields(guidance){
+  fieldsBox.innerHTML = components.map(([key,title,prompt]) => {
+    const hints = guidance?.[key] || [];
+    return `<article class="view-card"><h3>${escapeHtml(title)}</h3><p class="prompt">${escapeHtml(prompt)}</p><textarea data-field="${key}" maxlength="800" placeholder="Write your own working sentence or notes here…"></textarea><div class="hint-row">${hints.map((_,i)=>`<button type="button" class="hint-button" data-hint-key="${key}" data-hint-index="${i}">${i===0?'Show a hint':`More help ${i+1}`}</button>`).join('')}</div><div class="hint-box hidden" data-hint-box="${key}"></div></article>`;
+  }).join('');
+  fieldsBox.querySelectorAll('[data-hint-key]').forEach(button => button.addEventListener('click',()=>{
+    const key=button.dataset.hintKey, index=Number(button.dataset.hintIndex), box=fieldsBox.querySelector(`[data-hint-box="${key}"]`);
+    box.textContent=(guidance[key]||[])[index]||''; box.classList.remove('hidden');
   }));
 }
 
-async function translateToThai({ button, output, text }) {
-  const originalLabel = "Translate to Thai";
-  button.disabled = true;
-  button.textContent = "Translating…";
-
-  try {
-    const response = await fetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.translatedText) {
-      throw new Error(data.error || "Unable to translate the response.");
-    }
-
-    output.textContent = data.translatedText;
-    output.classList.remove("hidden", "translation-error");
-    button.textContent = "Translated to Thai";
-  } catch (error) {
-    output.textContent = error.message || "Unable to translate the response.";
-    output.classList.remove("hidden");
-    output.classList.add("translation-error");
-    button.disabled = false;
-    button.textContent = originalLabel;
-  }
+function renderBrief(context){
+  if(!context?.baseline) return;
+  const sources=(context.sources||[]).map((s,i)=>`<a href="${escapeAttr(s.url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(s.title||`Source ${i+1}`)}">${i+1}</a>`).join('');
+  briefBox.innerHTML=`<p class="eyebrow">Current context</p><h2>Source-based market brief</h2>${context.assumption?`<div class="assumption"><strong>Assumption:</strong> ${escapeHtml(context.assumption)}</div>`:''}<div class="context-grid">${part('Baseline',context.baseline)}${part('Observed facts',context.observed)}${part('What could change',context.watch)}</div>${sources?`<div class="source-strip">Sources ${sources}</div>`:''}`;
+  briefBox.classList.remove('hidden');
 }
 
-function viewPart(title, text) {
-  return `<div class="view-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text || "")}</p></div>`;
+function renderReview(data){
+  const labels={view:'V — Baseline view',influences:'I — What may change it',effects:'E — Possible relevance',whatMatters:'W — Welcome what matters'};
+  reviewBox.innerHTML=`<article class="panel"><p class="eyebrow">Feedback</p><h2>Your VIEW review</h2><div class="review-grid">${Object.entries(data.feedback||{}).map(([key,item])=>`<div class="feedback-card"><h3>${escapeHtml(labels[key]||key)}</h3><p><strong>What works:</strong> ${escapeHtml(item.strength)}</p><p><strong>Consider:</strong> ${escapeHtml(item.improvement)}</p></div>`).join('')}</div></article><article class="panel"><p class="eyebrow">Light refinement</p><h2>Your assembled VIEW draft</h2><div class="draft-response">${escapeHtml(data.refinedResponse)}</div><div class="reflection"><strong>Before using it:</strong> ${escapeHtml(data.verificationPrompt)}</div></article>`;
+  reviewBox.classList.remove('hidden');
 }
 
-function formatDate(value) {
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC"
-  }).format(date);
-}
-
-function escapeHtml(value = "") {
-  return String(value).replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  })[character]);
-}
-
-function escapeAttribute(value = "") {
-  return escapeHtml(value);
-}
+function part(title,text){return `<div class="context-part"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text||'')}</p></div>`;}
+function setBusy(button,busy,label){button.disabled=busy;button.textContent=label;}
+function escapeHtml(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+function escapeAttr(v=''){return escapeHtml(v);}

@@ -3,62 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VIEW Framework</title>
+  <title>VIEW Guided Practice</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <main class="container">
     <header class="panel hero">
-      <h1>VIEW Framework</h1>
-      <p>V - Give a baseline view</p>
-      <p>I - Identify what may change the view</p>
-      <p>E - Explain why it may matter</p>
-      <p>W - Keep the conversation open</p>
+      <p class="eyebrow">VIEW · Stage 2</p>
+      <h1>Build a VIEW response with guidance</h1>
+      <p>Develop your own response one part at a time. Your notes do not need to be polished.</p>
     </header>
 
-    <form id="viewForm" class="panel">
+    <form id="setupForm" class="panel setup-panel">
       <label for="question">Client question</label>
-      <textarea id="question" maxlength="1500" required
-        placeholder="Do you think interest rates will fall soon?"></textarea>
-
+      <textarea id="question" maxlength="1500" required placeholder="Do you think interest rates will fall soon?"></textarea>
       <div class="form-row">
         <div>
           <label for="marketRegion">Market or region <span>(optional)</span></label>
-          <input id="marketRegion" maxlength="120"
-            placeholder="e.g. United States, Singapore, United Kingdom">
-          <small>Useful for rates, currencies, regulation, and market outlooks.</small>
+          <input id="marketRegion" maxlength="120" placeholder="e.g. Thailand, Singapore">
+          <small>Ambiguous rates questions default to Thailand.</small>
         </div>
-
         <div>
           <label for="clientContext">Client context <span>(optional)</span></label>
-          <textarea id="clientContext" class="compact" maxlength="1000"
-            placeholder="e.g. The client is refinancing a facility in six months."></textarea>
+          <textarea id="clientContext" class="compact" maxlength="1000" placeholder="Keep this general. Do not enter confidential information."></textarea>
         </div>
       </div>
-
       <label class="checkbox">
         <input id="useMarketContext" type="checkbox" checked>
-        <span>
-          Use current source-based market context
-          <small>This uses the analysis model and web search.</small>
-        </span>
+        <span>Use current source-based market context</span>
       </label>
-
-      <button id="submitButton" class="primary-button" type="submit">Generate suggested response</button>
-      <p class="diagnostic-link">
-        Having trouble? <a href="/api/test" target="_blank" rel="noopener noreferrer">Test the API key binding</a>
-      </p>
+      <button id="startButton" class="primary-button" type="submit">Start guided practice</button>
+      <p class="diagnostic-link">Having trouble? <a href="/api/test" target="_blank" rel="noopener noreferrer">Test the API key binding</a></p>
     </form>
 
     <p id="status" class="status" aria-live="polite"></p>
-    <section id="marketContext" class="panel hidden"></section>
-    <section id="answers" class="answers" aria-live="polite"></section>
+    <section id="brief" class="panel hidden"></section>
 
-    <footer>
-      Do not enter confidential client information. Verify time-sensitive information before using it with a client.
-    </footer>
+    <section id="workspace" class="hidden">
+      <div class="panel workspace-heading">
+        <p class="eyebrow">Your working draft</p>
+        <h2>Build the four parts</h2>
+        <p>Write in your own words. Open hints only when they are useful.</p>
+      </div>
+      <div id="viewFields" class="view-fields"></div>
+      <div class="panel action-panel">
+        <button id="reviewButton" class="primary-button" type="button">Review my VIEW draft</button>
+      </div>
+    </section>
+
+    <section id="review" class="hidden" aria-live="polite"></section>
+
+    <footer>Do not enter confidential client information. Verify time-sensitive information before using it with a client.</footer>
   </main>
-
   <script src="/app.js" defer></script>
 </body>
 </html>
