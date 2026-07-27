@@ -1,3 +1,5 @@
+import { createPostHogClient } from "../../lib/posthog.js";
+
 const OPENAI_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_ANSWER_MODEL = "gpt-5.6-terra";
 const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
@@ -45,6 +47,9 @@ const MARKET_CONTEXT_SCHEMA = {
 };
 
 export async function onRequestPost({ request, env }) {
+  const posthog = createPostHogClient(env);
+  const distinctId = request.headers.get("x-posthog-distinct-id") || "anonymous";
+
   try {
     requireApiKey(env);
 
@@ -80,6 +85,21 @@ export async function onRequestPost({ request, env }) {
       ...input
     });
 
+    if (posthog) {
+      posthog.capture({
+        distinctId,
+        event: "view_response_generated",
+        properties: {
+          answer_model: answerModel,
+          analysis_model: input.useMarketContext ? analysisModel : null,
+          used_market_context: input.useMarketContext,
+          market_region: input.marketRegion || null,
+          has_client_context: Boolean(input.clientContext)
+        }
+      });
+      await posthog.shutdown();
+    }
+
     return json({
       answer,
       marketContext,
@@ -90,6 +110,20 @@ export async function onRequestPost({ request, env }) {
     });
   } catch (error) {
     console.error("VIEW API error", error);
+
+    if (posthog) {
+      posthog.captureException(error, distinctId);
+      posthog.capture({
+        distinctId,
+        event: "view_response_failed",
+        properties: {
+          error_message: error.publicMessage || error.message || "Unknown error",
+          error_status: error.status || 500
+        }
+      });
+      await posthog.shutdown();
+    }
+
     return json(
       {
         error: error.publicMessage || error.message || "Unable to generate responses.",
