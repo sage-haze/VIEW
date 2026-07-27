@@ -1,5 +1,8 @@
 {
   "name": "view-conversation-coach",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "posthog-node": "^5.46.1"
+  }
 }
