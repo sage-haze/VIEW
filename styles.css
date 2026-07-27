@@ -4,9 +4,9 @@ body { margin: 0; }
 .container { width: min(1000px, calc(100% - 28px)); margin: 22px auto; }
 .panel { background: #fff; border: 1px solid #d9e3e8; border-radius: 14px; padding: 20px; box-shadow: 0 6px 18px rgba(31,55,70,.045); margin-bottom: 14px; }
 .compact-panel { padding: 16px 18px; }
-.hero { display: flex; align-items: end; justify-content: space-between; gap: 28px; background: linear-gradient(135deg,#f7fbfc,#e7f1f4); }
+.hero { display: block; background: linear-gradient(135deg,#f7fbfc,#e7f1f4); }
 .hero h1 { margin: 3px 0 0; font-size: clamp(25px,4vw,38px); line-height: 1.1; }
-.hero > p { max-width: 390px; margin: 0; color: #52636d; font-size: 14px; line-height: 1.5; }
+.hero > p { max-width: none; margin: 10px 0 0; color: #52636d; font-size: 14px; line-height: 1.5; }
 .eyebrow { margin: 0; color: #52717e; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 750; }
 h2 { margin: 3px 0 0; font-size: 22px; }
 label { display: block; font-weight: 700; margin-bottom: 6px; font-size: 14px; }
@@ -57,7 +57,6 @@ footer { text-align: center; margin-top: 18px; padding-bottom: 8px; }
 @media (max-width:760px){
   .container{width:min(100% - 18px,1000px);margin:10px auto}
   .panel{padding:16px}
-  .hero{display:block}.hero>p{margin-top:9px;max-width:none}
   .form-row,.context-grid,.view-fields,.review-grid{grid-template-columns:1fr}
   .setup-actions,.workspace-heading{align-items:stretch;flex-direction:column;gap:10px}
   .setup-actions .primary-button,.action-panel .primary-button{width:100%}
