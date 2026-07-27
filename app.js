@@ -60,18 +60,30 @@ reviewButton.addEventListener('click', async () => {
 function renderFields(guidance){
   fieldsBox.innerHTML = components.map(([key,title,prompt]) => {
     const hints = guidance?.[key] || [];
-    return `<article class="view-card"><h3>${escapeHtml(title)}</h3><p class="prompt">${escapeHtml(prompt)}</p><textarea data-field="${key}" maxlength="800" placeholder="Write your own working sentence or notes here…"></textarea><div class="hint-row">${hints.map((_,i)=>`<button type="button" class="hint-button" data-hint-key="${key}" data-hint-index="${i}">${i===0?'Show a hint':`More help ${i+1}`}</button>`).join('')}</div><div class="hint-box hidden" data-hint-box="${key}"></div></article>`;
+    const hintControl = hints.length ? `<button type="button" class="hint-button" data-hint-key="${key}" data-hint-index="0">Show hint</button>` : '';
+    return `<article class="view-card"><h3>${escapeHtml(title)}</h3><p class="prompt">${escapeHtml(prompt)}</p><textarea data-field="${key}" maxlength="800" placeholder="Write a working sentence or notes…"></textarea><div class="hint-row">${hintControl}</div><div class="hint-box hidden" data-hint-box="${key}"></div></article>`;
   }).join('');
   fieldsBox.querySelectorAll('[data-hint-key]').forEach(button => button.addEventListener('click',()=>{
-    const key=button.dataset.hintKey, index=Number(button.dataset.hintIndex), box=fieldsBox.querySelector(`[data-hint-box="${key}"]`);
-    box.textContent=(guidance[key]||[])[index]||''; box.classList.remove('hidden');
+    const key = button.dataset.hintKey;
+    const hints = guidance[key] || [];
+    const index = Number(button.dataset.hintIndex || 0);
+    const box = fieldsBox.querySelector(`[data-hint-box="${key}"]`);
+    box.textContent = hints[index] || '';
+    box.classList.remove('hidden');
+    const next = index + 1;
+    if (next < hints.length) {
+      button.dataset.hintIndex = String(next);
+      button.textContent = 'More help';
+    } else {
+      button.remove();
+    }
   }));
 }
 
 function renderBrief(context){
   if(!context?.baseline) return;
   const sources=(context.sources||[]).map((s,i)=>`<a href="${escapeAttr(s.url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(s.title||`Source ${i+1}`)}">${i+1}</a>`).join('');
-  briefBox.innerHTML=`<p class="eyebrow">Current context</p><h2>Source-based market brief</h2>${context.assumption?`<div class="assumption"><strong>Assumption:</strong> ${escapeHtml(context.assumption)}</div>`:''}<div class="context-grid">${part('Baseline',context.baseline)}${part('Observed facts',context.observed)}${part('What could change',context.watch)}</div>${sources?`<div class="source-strip">Sources ${sources}</div>`:''}`;
+  briefBox.innerHTML=`<div class="brief-heading"><div><p class="eyebrow">Current context</p><h2>Source-based market brief</h2></div>${sources?`<div class="source-strip">Sources ${sources}</div>`:''}</div>${context.assumption?`<div class="assumption"><strong>Assumption:</strong> ${escapeHtml(context.assumption)}</div>`:''}<div class="context-grid">${part('Baseline',context.baseline)}${part('Observed facts',context.observed)}${part('What could change',context.watch)}</div>`;
   briefBox.classList.remove('hidden');
 }
 

@@ -9,44 +9,54 @@
 <body>
   <main class="container">
     <header class="panel hero">
-      <p class="eyebrow">VIEW · Stage 2</p>
-      <h1>Build a VIEW response with guidance</h1>
-      <p>Develop your own response one part at a time. Your notes do not need to be polished.</p>
+      <div>
+        <p class="eyebrow">VIEW · Stage 2</p>
+        <h1>Build a VIEW response with guidance</h1>
+      </div>
+      <p>Draft the four parts in your own words. Open hints only when useful.</p>
     </header>
 
     <form id="setupForm" class="panel setup-panel">
       <label for="question">Client question</label>
       <textarea id="question" maxlength="1500" required placeholder="Do you think interest rates will fall soon?"></textarea>
-      <div class="form-row">
-        <div>
-          <label for="marketRegion">Market or region <span>(optional)</span></label>
-          <input id="marketRegion" maxlength="120" placeholder="e.g. Thailand, Singapore">
-          <small>Ambiguous rates questions default to Thailand.</small>
+
+      <details class="optional-details">
+        <summary>Add optional context</summary>
+        <div class="form-row">
+          <div>
+            <label for="marketRegion">Market or region</label>
+            <input id="marketRegion" maxlength="120" placeholder="e.g. Thailand, Singapore">
+          </div>
+          <div>
+            <label for="clientContext">Client context</label>
+            <textarea id="clientContext" class="compact" maxlength="1000" placeholder="Keep this general. Do not enter confidential information."></textarea>
+          </div>
         </div>
-        <div>
-          <label for="clientContext">Client context <span>(optional)</span></label>
-          <textarea id="clientContext" class="compact" maxlength="1000" placeholder="Keep this general. Do not enter confidential information."></textarea>
-        </div>
+      </details>
+
+      <div class="setup-actions">
+        <label class="checkbox">
+          <input id="useMarketContext" type="checkbox" checked>
+          <span>Use current source-based market context</span>
+        </label>
+        <button id="startButton" class="primary-button" type="submit">Start guided practice</button>
       </div>
-      <label class="checkbox">
-        <input id="useMarketContext" type="checkbox" checked>
-        <span>Use current source-based market context</span>
-      </label>
-      <button id="startButton" class="primary-button" type="submit">Start guided practice</button>
       <p class="diagnostic-link">Having trouble? <a href="/api/test" target="_blank" rel="noopener noreferrer">Test the API key binding</a></p>
     </form>
 
     <p id="status" class="status" aria-live="polite"></p>
-    <section id="brief" class="panel hidden"></section>
+    <section id="brief" class="panel compact-panel hidden"></section>
 
     <section id="workspace" class="hidden">
-      <div class="panel workspace-heading">
-        <p class="eyebrow">Your working draft</p>
-        <h2>Build the four parts</h2>
-        <p>Write in your own words. Open hints only when they are useful.</p>
+      <div class="workspace-heading">
+        <div>
+          <p class="eyebrow">Your working draft</p>
+          <h2>Build the four parts</h2>
+        </div>
+        <p>Notes are fine. You can refine them after feedback.</p>
       </div>
       <div id="viewFields" class="view-fields"></div>
-      <div class="panel action-panel">
+      <div class="action-panel">
         <button id="reviewButton" class="primary-button" type="button">Review my VIEW draft</button>
       </div>
     </section>
