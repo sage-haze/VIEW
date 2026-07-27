@@ -60,6 +60,10 @@ export async function onRequestPost({ request, env }) {
       return json({ error: "Please enter a client question." }, 400);
     }
 
+    const regionResolution = resolveMarketRegion(input.question, input.marketRegion);
+    input.marketRegion = regionResolution.marketRegion;
+    input.marketRegionWasDefaulted = regionResolution.wasDefaulted;
+
     const answerModel = modelFromEnv(
       env.OPENAI_ANSWER_MODEL,
       DEFAULT_ANSWER_MODEL
@@ -119,9 +123,9 @@ async function createMarketContext({
         role: "system",
         content: `Prepare a compact, source-based market context for a banker answering a client question.
 
-Use current, authoritative sources. Start with sources from the country, market or region named in the question. Strongly prioritise the relevant local central bank, regulator, government statistical agency, official benchmark administrator and reputable local or regional reporting. Use global institutions and overseas central banks only for genuinely relevant external drivers, not as substitutes for local evidence.
+Use current, authoritative sources. Start with sources from the country, market or region named in the question. Strongly prioritise the relevant local central bank, regulator, government statistical agency, official benchmark administrator and reputable local or regional reporting. Use global institutions and overseas central banks only for genuinely relevant external drivers, not as substitutes for local evidence. If the supplied market or region says Thailand was used as an application default, treat Thailand as a working assumption and state that assumption clearly rather than presenting it as something the client specified.
 
-Aim for source diversity: use at least two independent high-quality publishers or institutions whenever the topic permits, and avoid relying on several pages from the same domain. When a jurisdiction is explicit, most supporting sources should directly cover that jurisdiction. For example, for Singapore mortgages or Singapore-dollar rates, prioritise MAS, Singapore government or benchmark sources, the Association of Banks in Singapore, and reputable Singapore or Asia-focused reporting; Federal Reserve material may support the global-rate backdrop but should not dominate the evidence.
+Aim for source diversity: use at least two independent high-quality publishers or institutions whenever the topic permits, and avoid relying on several pages from the same domain. When a jurisdiction is explicit, most supporting sources should directly cover that jurisdiction. For example, for Singapore mortgages or Singapore-dollar rates, prioritise MAS, Singapore government or benchmark sources, the Association of Banks in Singapore, and reputable Singapore or Asia-focused reporting; Federal Reserve material may support the global-rate backdrop but should not dominate the evidence. For Thailand rates, prioritise the Bank of Thailand, Thai government or official statistical sources, Thai bond or benchmark administrators, and reputable Thailand or regional reporting.
 
 Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
 
@@ -347,6 +351,25 @@ function comparisonKey(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function resolveMarketRegion(question, marketRegion) {
+  if (marketRegion) {
+    return { marketRegion, wasDefaulted: false };
+  }
+
+  const text = clean(question, 1500).toLowerCase();
+  const rateQuestion = /\b(interest rates?|policy rates?|mortgage rates?|home loans?|housing loans?|fixed rates?|floating rates?|borrowing rates?|deposit rates?|refinancing|refinance)\b/.test(text);
+  const localeSignal = /\b(thailand|thai|thb|bangkok|singapore|sgd|sora|mas|malaysia|myr|bank negara|united states|u\.s\.|usa|usd|fed|federal reserve|united kingdom|uk|gbp|sterling|bank of england|euro area|eurozone|eur|ecb|japan|jpy|boj|china|cny|rmb|pboc|hong kong|hkd|hkma|indonesia|idr|philippines|php|vietnam|vnd|india|inr|australia|aud|canada|cad|new zealand|nzd)\b/.test(text);
+
+  if (rateQuestion && !localeSignal) {
+    return {
+      marketRegion: "Thailand (application default because the rates question did not specify a locale)",
+      wasDefaulted: true
+    };
+  }
+
+  return { marketRegion: "", wasDefaulted: false };
 }
 
 function formatClientInput({ question, marketRegion, clientContext }) {
@@ -575,6 +598,13 @@ function regionalSourceBoost({ url, title }, context) {
       ]
     },
     {
+      match: /\b(thailand|thai|thb|bank of thailand|bot)\b/,
+      local: [
+        "bot.or.th", "nso.go.th", "mof.go.th", "thaibma.or.th",
+        "bangkokpost.com", "nationthailand.com", "set.or.th"
+      ]
+    },
+    {
       match: /\b(malaysia|myr|bank negara|bnm)\b/,
       local: ["bnm.gov.my", "dosm.gov.my", "bernama.com", "theedgemalaysia.com"]
     },
@@ -637,7 +667,7 @@ function sourcePriority({ url }) {
   const officialPatterns = [
     ".gov", ".gov.uk", ".europa.eu", "imf.org", "worldbank.org",
     "bis.org", "oecd.org", "un.org", "ecb.europa.eu", "federalreserve.gov",
-    "bankofengland.co.uk", "mas.gov.sg"
+    "bankofengland.co.uk", "mas.gov.sg", "bot.or.th"
   ];
   if (officialPatterns.some((pattern) => hostname.endsWith(pattern) || hostname.includes(pattern))) {
     return 4;

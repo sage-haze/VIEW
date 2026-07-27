@@ -254,3 +254,50 @@ footer { color: #657086; font-size: .85rem; padding: 18px 4px; }
     grid-template-columns: 1fr;
   }
 }
+
+.translation-actions {
+  margin-top: 7px;
+  text-align: right;
+}
+
+.translate-button {
+  border: 0;
+  background: transparent;
+  color: #6f7889;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: .72rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.translate-button:hover,
+.translate-button:focus-visible {
+  color: #243f9d;
+  outline: none;
+  background: #f4f6fa;
+}
+
+.translate-button:disabled {
+  cursor: default;
+  opacity: .72;
+}
+
+.thai-translation {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-left: 2px solid #cbd4e5;
+  background: #fafbfe;
+  border-radius: 4px 9px 9px 4px;
+  color: #30394b;
+  font-size: .96rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.thai-translation.translation-error {
+  color: #a12626;
+  border-left-color: #d7a4a4;
+}

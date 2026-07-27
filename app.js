@@ -137,6 +137,10 @@ function renderAnswer(answer) {
         <h2>${escapeHtml(answer.label || "Suggested response")}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
+      <div class="translation-actions">
+        <button class="translate-button" type="button" data-translate-to-thai>Translate to Thai</button>
+      </div>
+      <div class="thai-translation hidden" data-thai-translation lang="th" aria-live="polite"></div>
       <div class="view-grid">
         ${viewPart("V — Baseline view", answer.view)}
         ${viewPart("I — What may change it", answer.influences)}
@@ -153,6 +157,42 @@ function renderAnswer(answer) {
       </details>
     </article>
   `;
+
+  const translateButton = answersBox.querySelector("[data-translate-to-thai]");
+  const translationBox = answersBox.querySelector("[data-thai-translation]");
+  translateButton?.addEventListener("click", () => translateToThai({
+    button: translateButton,
+    output: translationBox,
+    text: answer.response
+  }));
+}
+
+async function translateToThai({ button, output, text }) {
+  const originalLabel = "Translate to Thai";
+  button.disabled = true;
+  button.textContent = "Translating…";
+
+  try {
+    const response = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.translatedText) {
+      throw new Error(data.error || "Unable to translate the response.");
+    }
+
+    output.textContent = data.translatedText;
+    output.classList.remove("hidden", "translation-error");
+    button.textContent = "Translated to Thai";
+  } catch (error) {
+    output.textContent = error.message || "Unable to translate the response.";
+    output.classList.remove("hidden");
+    output.classList.add("translation-error");
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
 }
 
 function viewPart(title, text) {
