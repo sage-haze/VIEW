@@ -134,7 +134,7 @@ function renderAnswer(answer) {
   answersBox.innerHTML = `
     <article class="panel answer">
       <div class="answer-heading">
-        <h2>${escapeHtml(answer.label || "Suggested response")}</h2>
+        <h2>${escapeHtml(answer.label || "One possible VIEW response")}</h2>
       </div>
       <blockquote class="response">${escapeHtml(answer.response)}</blockquote>
       <div class="translation-actions">

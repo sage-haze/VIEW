@@ -4,7 +4,7 @@ const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
 
 const BANKER_PROFILE = {
   id: "friendly_junior",
-  label: "Suggested response"
+  label: "One possible VIEW response"
 };
 
 const VIEW_ANSWER_SCHEMA = {
