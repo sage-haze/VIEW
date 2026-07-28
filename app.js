@@ -89,7 +89,7 @@ function renderBrief(context){
 
 function renderReview(data){
   const labels={view:'V — Baseline view',influences:'I — What may change it',effects:'E — Possible relevance',whatMatters:'W — Welcome what matters'};
-  reviewBox.innerHTML=`<article class="panel"><p class="eyebrow">Feedback</p><h2>Your VIEW review</h2><div class="review-grid">${Object.entries(data.feedback||{}).map(([key,item])=>`<div class="feedback-card"><h3>${escapeHtml(labels[key]||key)}</h3><p><strong>What works:</strong> ${escapeHtml(item.strength)}</p><p><strong>Consider:</strong> ${escapeHtml(item.improvement)}</p></div>`).join('')}</div></article><article class="panel"><p class="eyebrow">Light refinement</p><h2>Your assembled VIEW draft</h2><div class="draft-response">${escapeHtml(data.refinedResponse)}</div><div class="reflection"><strong>Before using it:</strong> ${escapeHtml(data.verificationPrompt)}</div></article>`;
+  reviewBox.innerHTML=`<article class="panel"><p class="eyebrow">Feedback</p><h2>Your VIEW review</h2><div class="review-grid">${Object.entries(data.feedback||{}).map(([key,item])=>`<div class="feedback-card"><h3>${escapeHtml(labels[key]||key)}</h3><p><strong>What works:</strong> ${escapeHtml(item.strength)}</p><p><strong>One gentle suggestion:</strong> ${escapeHtml(item.improvement)}</p></div>`).join('')}</div></article><article class="panel"><p class="eyebrow">Light refinement</p><h2>Your assembled VIEW draft</h2><div class="draft-response">${escapeHtml(data.refinedResponse)}</div><div class="reflection"><strong>Before using it:</strong> ${escapeHtml(data.verificationPrompt)}</div></article>`;
   reviewBox.classList.remove('hidden');
 }
 
