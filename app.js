@@ -76,11 +76,9 @@ function renderMarketContext(context, approvedFxSource) {
   if (!context?.baseline && !approvedFxSource) return;
 
   const sources = Array.isArray(context?.sources) ? context.sources : [];
-  const approvedSourceNote = approvedFxSource ? `
-    <div class="assumption">
-      <strong>Internal Guidance</strong>
-      <span>${escapeHtml(formatApprovedSource(approvedFxSource))}</span>
-    </div>` : "";
+  const approvedSourceNote = approvedFxSource
+    ? renderInternalGuidance(approvedFxSource)
+    : "";
 
   marketBox.innerHTML = `
     <div class="section-heading">
@@ -112,19 +110,36 @@ function renderMarketContext(context, approvedFxSource) {
   marketBox.classList.remove("hidden");
 }
 
-function formatApprovedSource(source) {
+function renderInternalGuidance(source) {
   const period = source.periodStart && source.periodEnd
-    ? `${formatDate(source.periodStart)} - ${formatDate(source.periodEnd)}`
+    ? `${formatDate(source.periodStart)} – ${formatDate(source.periodEnd)}`
     : source.publicationDate
       ? formatDate(source.publicationDate)
-      : "date not stated";
-  const sections = Array.isArray(source.pairs) && source.pairs.length
-    ? ` Relevant section${source.pairs.length > 1 ? "s" : ""}: ${source.pairs.join(", ")}.`
-    : "";
-  const background = source.backgroundSummary
-    ? ` ${source.backgroundSummary}`
-    : "";
-  return `Guidance from ${period}.${sections}${background}`;
+      : "Date not stated";
+
+  const items = Array.isArray(source.guidanceItems) && source.guidanceItems.length
+    ? source.guidanceItems
+    : (Array.isArray(source.pairs) ? source.pairs : []).map((pair) => ({
+        pair,
+        summary: source.backgroundSummary || ""
+      }));
+
+  const guidanceRows = items
+    .filter((item) => item?.summary)
+    .map((item) => `
+      <div class="guidance-item">
+        <strong>${escapeHtml(item.pair || "Guidance")}</strong>
+        <p>${escapeHtml(item.summary)}</p>
+      </div>`).join("");
+
+  return `
+    <section class="internal-guidance" aria-label="Internal guidance">
+      <div class="guidance-heading">
+        <strong>Internal Guidance</strong>
+        <span>Guidance from ${escapeHtml(period)}</span>
+      </div>
+      ${guidanceRows || `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
+    </section>`;
 }
 
 function renderSources(sources) {

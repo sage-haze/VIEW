@@ -124,3 +124,8 @@ When a new PDF is uploaded through the manager, the application:
 5. writes `processed/<filename>.json`.
 
 The upload accepts PDFs up to 20 MB. Do not place the refresh token in source code. Configure it as the Cloudflare Pages secret `FX_REFRESH_TOKEN`; the manager stores the entered value only in that browser's local storage.
+
+
+## Internal Guidance display
+
+Processed reports now use schema version 2. The first request after deployment will rebuild an older cached JSON so each relevant currency pair includes a short plain-English summary for the learner-facing Internal Guidance panel.

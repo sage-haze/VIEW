@@ -31,7 +31,8 @@ const FX_REPORT_SCHEMA = {
           supportingFactors: { type: "array", items: { type: "string" } },
           changeFactors: { type: "array", items: { type: "string" } },
           possibleBusinessImplications: { type: "array", items: { type: "string" } },
-          keyLevelsSummary: { type: "string" }
+          keyLevelsSummary: { type: "string" },
+          plainEnglishSummary: { type: "string" }
         },
         required: [
           "pair",
@@ -40,7 +41,8 @@ const FX_REPORT_SCHEMA = {
           "supportingFactors",
           "changeFactors",
           "possibleBusinessImplications",
-          "keyLevelsSummary"
+          "keyLevelsSummary",
+          "plainEnglishSummary"
         ]
       }
     },
@@ -92,7 +94,7 @@ export async function getOrRefreshFxReport({ env, allowRefresh = true, force = f
     try {
       const cached = await cachedObject.json();
       if (
-        cached?.schemaVersion === 1 &&
+        cached?.schemaVersion === 2 &&
         cached?.source?.key === source.key &&
         cached?.source?.etag === source.etag
       ) {
@@ -167,6 +169,7 @@ Rules:
 - Keep each currency pair separate.
 - Distinguish the report's baseline view from factors that support it and factors that could change it.
 - Possible business implications must remain conditional and must not become recommendations.
+- For plainEnglishSummary, write one or two short sentences for a non-specialist. Explain the direction and the main reason using everyday language. Avoid jargon such as high-beta, hawkish, terms of trade, carry, repricing, or risk proxy. Do not include figures unless essential.
 - Summarise levels rather than inventing missing values.
 - Use an empty string or empty array where the document does not provide an item.
 - Do not add current web information or your own market view.`
@@ -229,7 +232,7 @@ Rules:
     }
 
     const stored = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: {
         key: source.key,
         etag: source.etag,
@@ -347,15 +350,18 @@ Usage rules:
 }
 
 function sourceSummary(report, source, pairs = [], sections = []) {
-  const backgroundSummary = sections
-    .map((section) => {
-      const pair = section?.pair ? `${section.pair}: ` : "";
-      const movement = clean(section?.recentMovement || "", 240);
-      const view = clean(section?.baselineView || "", 320);
-      if (movement && view) return `${pair}${movement} ${view}`;
-      return `${pair}${view || movement}`.trim();
-    })
-    .filter(Boolean)
+  const guidanceItems = sections
+    .map((section) => ({
+      pair: clean(section?.pair || "", 20),
+      summary: clean(
+        section?.plainEnglishSummary || section?.baselineView || section?.recentMovement || "",
+        300
+      )
+    }))
+    .filter((item) => item.pair && item.summary);
+
+  const backgroundSummary = guidanceItems
+    .map((item) => `${item.pair}: ${item.summary}`)
     .join(" ");
 
   return {
@@ -366,6 +372,7 @@ function sourceSummary(report, source, pairs = [], sections = []) {
     sourceKey: source?.key || report?.source?.key || "",
     processedAt: report?.source?.processedAt || "",
     pairs,
+    guidanceItems,
     backgroundSummary
   };
 }
