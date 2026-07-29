@@ -1,84 +1,162 @@
-# VIEW Framework — complete GitHub replacement
+# VIEW Stage 1 with approved FX reports
 
-This folder is a complete Cloudflare Pages project. Upload **the contents of this folder** to the root of your GitHub repository, replacing the existing files.
+This version adds an R2-backed approved source workflow.
 
-## What this version changes
+## Required Cloudflare bindings and secrets
 
-- Refactors the answer prompt to remove repeated and overly prescriptive instructions.
-- Generates three genuinely different banker perspectives:
-  1. Friendly relationship builder
-  2. Commercial planning partner
-  3. Risk-aware specialist
-- Uses structured JSON output for the market brief and the three responses.
-- Keeps the VIEW framework visible in every answer.
-- Returns persona labels from the server instead of duplicating them in browser code.
-- Uses topic-specific fallback client questions when the model repeats or produces a generic question.
-- Preserves the API health and API-key test endpoints.
+- `OPENAI_API_KEY` — secret
+- `FX_REPORTS` — R2 bucket binding
+- `FX_REFRESH_TOKEN` — secret containing a long random value
 
-## Repository structure
+Optional model variables:
 
-```text
-_headers
-index.html
-app.js
-styles.css
-package.json
-README.md
-functions/
-  api/
-    health.js
-    test.js
-    view.js
+- `OPENAI_ANSWER_MODEL` — defaults to `gpt-5.6-terra`
+- `OPENAI_ANALYSIS_MODEL` — defaults to `gpt-5.4-mini`
+- `OPENAI_EXTRACTION_MODEL` — defaults to `OPENAI_ANALYSIS_MODEL`, then `gpt-5.4-mini`
+
+Create the same bindings in each Cloudflare Pages environment that you use, then redeploy.
+
+## R2 layout
+
+Upload exactly one current PDF to:
+
+```
+source/<your-report-name>.pdf
 ```
 
-## Cloudflare Pages settings
+The application writes the processed cache to:
 
-Keep these runtime bindings under **Settings → Variables and Secrets** for the Production environment:
-
-```text
-OPENAI_API_KEY          Secret
-OPENAI_ANSWER_MODEL     gpt-5.6-terra
-OPENAI_ANALYSIS_MODEL   gpt-5.4-mini
+```
+processed/<your-report-name>.json
 ```
 
-`OPENAI_API_KEY` must be a runtime secret, not a value placed in the browser code or GitHub repository.
+Do not upload a JSON file manually. The refresh function creates it.
 
-## Deployment
+## Refresh after uploading a PDF
 
-1. Delete or replace the existing repository files with the contents of this folder.
-2. Commit the changes to the branch connected to Cloudflare Pages.
-3. Wait for the Production deployment to complete.
-4. Test these URLs:
+The protected endpoint is:
 
-```text
-https://YOUR-DOMAIN/api/health
-https://YOUR-DOMAIN/api/test
+```
+POST /api/admin/refresh-fx-report
+Authorization: Bearer <FX_REFRESH_TOKEN>
 ```
 
-The health endpoint should show that the API key is configured. The test endpoint should confirm that OpenAI accepted the key.
+Example from a terminal:
 
-## Notes
+```bash
+curl -X POST \
+  -H "Authorization: Bearer YOUR_FX_REFRESH_TOKEN" \
+  https://YOUR-SITE.pages.dev/api/admin/refresh-fx-report
+```
 
-- The site uses Cloudflare Pages Functions, so the `functions` directory must remain at the repository root.
-- The browser calls `/api/view`; the API key is only read inside the Cloudflare Function.
-- Current market context is optional and uses the analysis model with web search.
-- Do not enter confidential client information.
+To force a rebuild even when the PDF etag matches:
 
-## July 2026 response-quality update
+```bash
+curl -X POST \
+  -H "Authorization: Bearer YOUR_FX_REFRESH_TOKEN" \
+  "https://YOUR-SITE.pages.dev/api/admin/refresh-fx-report?force=1"
+```
 
-This version also:
+A protected GET checks cache status without processing:
 
-- removes citation text and URLs from the market-brief cards while retaining links under **Sources used**;
-- generates response bodies and final client questions separately, then joins them once to prevent duplicated questions;
-- shortens the market brief for improved card readability;
-- sharpens the distinction between relationship-led, commercial-planning and risk-aware responses.
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_FX_REFRESH_TOKEN" \
+  https://YOUR-SITE.pages.dev/api/admin/refresh-fx-report
+```
+
+## Automatic fallback
+
+`/api/view` also checks the R2 cache. When a relevant FX question is asked and the JSON is missing or stale, it attempts one extraction and writes the JSON. The manual refresh endpoint is still preferable because it prevents the first learner after an upload from waiting for extraction.
+
+If extraction fails, the normal VIEW response can still run without the approved report. The failure is logged in Cloudflare rather than exposing internal details in the learner interface.
+
+## Health check
+
+Open:
+
+```
+/api/health
+```
+
+Confirm that these are true:
+
+- `openAIKeyConfigured`
+- `fxReportsConfigured`
+- `fxRefreshTokenConfigured`
+
+## How matching works
+
+The cache is considered current only when both the source key and source PDF etag match the values saved in the JSON. Replacing a PDF with a revised file under the same filename therefore triggers a rebuild.
+
+The report is supplied to the answer model only when the question mentions a supported pair or currency, including USDTHB, EURUSD, GBPUSD, AUDUSD, USDJPY and USDCNY. Broad foreign-exchange questions can use all available pair sections.
+
+## R2 troubleshooting
+
+`/api/health` now lists the exact object keys visible under `source/` and `processed/`.
+The PDF key must begin with `source/`, for example `source/FX Compass.pdf`.
+The dashboard's folders are prefixes; creating an empty folder alone does not put the PDF inside it.
+
+The learner endpoint now reports an extraction error in the page status instead of silently falling back to web context.
+For a deliberate refresh, configure `FX_REFRESH_TOKEN` and call the admin POST endpoint.
+
+## Web-only FX Report Manager
+
+Open:
+
+```
+/admin/fx-report.html
+```
+
+This page is intended for the site owner. It lets you:
+
+- save the `FX_REFRESH_TOKEN` in the current browser;
+- check whether the source PDF and processed JSON are current;
+- process or force-rebuild the existing PDF;
+- upload a replacement PDF directly from the browser.
+
+When a new PDF is uploaded through the manager, the application:
+
+1. writes it to `source/<filename>.pdf`;
+2. deletes other files under `source/`;
+3. deletes prior files under `processed/`;
+4. extracts the new PDF;
+5. writes `processed/<filename>.json`.
+
+The upload accepts PDFs up to 20 MB. Do not place the refresh token in source code. Configure it as the Cloudflare Pages secret `FX_REFRESH_TOKEN`; the manager stores the entered value only in that browser's local storage.
 
 
-## Conversational relevance calibration
+## Internal Guidance display
 
-The response prompt takes the client’s question at face value while allowing that there may be a personal, business or financial reason behind it. The final question now makes a gentle, topic-specific relevance link without claiming to know the client’s exact objective or pushing towards a transaction.
+Processed reports now use schema version 2. The first request after deployment will rebuild an older cached JSON so each relevant currency pair includes a short plain-English summary for the learner-facing Internal Guidance panel.
+
+## Alternative VIEW responses
+
+The answer panel includes **Generate another VIEW response**. It reuses the same market brief and approved FX context, so it does not repeat the web-search step. The answer model is asked to keep the same underlying direction while using meaningfully different, junior-attainable wording. This demonstrates that VIEW is a guide rather than a fixed script.
+
+## Downloading the internal guidance PDF
+
+When internal FX guidance is used, the Market Brief shows a **Download PDF** link. The link streams the single PDF currently stored under `source/` through:
+
+```text
+/api/fx-report/download
+```
+
+The endpoint expects exactly one PDF under `source/`. Anyone who can access the deployed endpoint can download the report, so protect the site with the same access controls appropriate for the internal document.
+
+## Source-faithful FX commentary schema
+
+FX report extraction now uses schema version 3. Each currency pair is rewritten once, during PDF processing, using the corporate-market-commentary writing guide. The processed JSON also records the report's displayed movement guidance, including the source label/symbol and a normalized direction and strength.
+
+After deploying this version, use the FX Report Manager to **Force rebuild** the current report. Existing schema-version-2 JSON will also be treated as stale and rebuilt automatically. The learner page reads `sourceFaithfulCommentary` directly rather than asking the answer model to paraphrase the report for the Internal Guidance panel.
 
 
-## v6 response style
+## Reference choices
 
-This version generates one friendly response for a junior banker with roughly one to two years of experience. It takes the client question at face value, avoids assuming a commercial need or market position, uses plain English, and avoids language that could sound corrective.
+The learner page offers three source modes:
+
+- **Internal guidance and market sources**: uses relevant content from the processed R2 report and current web search.
+- **Internal guidance only**: uses no web search. If the report does not contain a relevant currency section, the page asks the user to select another source.
+- **Market sources only**: uses current web search and does not read or display the internal FX guidance.
+
+The selected mode is preserved when the user generates another VIEW response.

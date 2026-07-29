@@ -12,8 +12,8 @@
       <h1>VIEW Framework</h1>
       <p>V - Give a baseline view</p>
       <p>I - Identify what may change the view</p>
-      <p>E - Explain why it may matter</p>
-      <p>W - Keep the conversation open</p>
+      <p>E - Explain possible implications</p>
+      <p>W - Welcome what matters to the client</p>
     </header>
 
     <form id="viewForm" class="panel">
@@ -36,18 +36,36 @@
         </div>
       </div>
 
-      <label class="checkbox">
-        <input id="useMarketContext" type="checkbox" checked>
-        <span>
-          Use current source-based market context
-          <small>This uses the analysis model and web search.</small>
-        </span>
-      </label>
+      <fieldset class="source-options">
+        <legend>Reference</legend>
+        <p class="field-help">Choose which information the response should rely on.</p>
+
+        <label class="source-option">
+          <input type="radio" name="referenceSource" value="combined" checked>
+          <span>
+            <strong>Internal guidance and market sources</strong>
+            <small>Uses the uploaded FX guidance together with current web sources.</small>
+          </span>
+        </label>
+
+        <label class="source-option">
+          <input type="radio" name="referenceSource" value="internal">
+          <span>
+            <strong>Internal guidance only</strong>
+            <small>Uses only relevant information extracted from the uploaded FX report.</small>
+          </span>
+        </label>
+
+        <label class="source-option">
+          <input type="radio" name="referenceSource" value="market">
+          <span>
+            <strong>Market sources only</strong>
+            <small>Uses current web sources without the internal FX guidance.</small>
+          </span>
+        </label>
+      </fieldset>
 
       <button id="submitButton" class="primary-button" type="submit">Generate suggested response</button>
-      <p class="diagnostic-link">
-        Having trouble? <a href="/api/test" target="_blank" rel="noopener noreferrer">Test the API key binding</a>
-      </p>
     </form>
 
     <p id="status" class="status" aria-live="polite"></p>

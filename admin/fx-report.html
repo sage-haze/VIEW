@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FX Report Manager</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="container admin-container">
+    <header class="panel admin-hero">
+      <div>
+        <p class="eyebrow">Website administration</p>
+        <h1>FX Report Manager</h1>
+        <p>Upload the latest approved PDF, replace the previous source, and create the processed JSON.</p>
+      </div>
+      <a class="secondary-button" href="/">Back to VIEW</a>
+    </header>
+
+    <section class="panel">
+      <h2>Access</h2>
+      <p class="helper-text">Enter the same value saved in Cloudflare as <code>FX_REFRESH_TOKEN</code>. It stays only in this browser.</p>
+      <label for="adminToken">Refresh token</label>
+      <div class="token-row">
+        <input id="adminToken" type="password" autocomplete="current-password" placeholder="Enter refresh token">
+        <button id="saveToken" class="secondary-button" type="button">Save token</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Current status</p>
+          <h2>Approved report</h2>
+        </div>
+        <button id="checkStatus" class="secondary-button" type="button">Check status</button>
+      </div>
+      <div id="reportStatus" class="admin-status-card" aria-live="polite">
+        Enter your token, then check the report status.
+      </div>
+      <div id="statusActions" class="button-row hidden">
+        <button id="processReport" class="primary-button" type="button">Process current PDF</button>
+        <button id="forceProcess" class="secondary-button" type="button">Force rebuild JSON</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <p class="eyebrow">Replace report</p>
+      <h2>Upload a new PDF</h2>
+      <p class="helper-text">The upload replaces the existing file in <code>source/</code>, removes old files in <code>processed/</code>, and processes the new report automatically.</p>
+
+      <form id="uploadForm" class="upload-form">
+        <label class="file-drop" for="pdfFile">
+          <span class="file-drop-title">Choose an FX report PDF</span>
+          <span id="selectedFile" class="file-drop-detail">PDF only, up to 20 MB</span>
+          <input id="pdfFile" name="file" type="file" accept="application/pdf,.pdf" required>
+        </label>
+        <button id="uploadButton" class="primary-button" type="submit">Upload and process report</button>
+      </form>
+      <p id="uploadStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel admin-notes">
+      <h2>Your normal update routine</h2>
+      <ol>
+        <li>Open this page.</li>
+        <li>Choose the new PDF.</li>
+        <li>Click <strong>Upload and process report</strong>.</li>
+        <li>Wait for the green “Ready” confirmation.</li>
+      </ol>
+      <p>You no longer need to open R2 or run code for normal report updates.</p>
+    </section>
+  </main>
+  <script src="/admin/fx-report.js" defer></script>
+</body>
+</html>
