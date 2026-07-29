@@ -40,7 +40,7 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.error || `Request failed (${response.status}).`);
     }
 
-    renderMarketContext(data.marketContext);
+    renderMarketContext(data.marketContext, data.approvedFxSource);
     renderAnswer(data.answer);
     statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
     answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -66,10 +66,15 @@ function setLoading(loading) {
   form.setAttribute("aria-busy", String(loading));
 }
 
-function renderMarketContext(context) {
-  if (!context?.baseline) return;
+function renderMarketContext(context, approvedFxSource) {
+  if (!context?.baseline && !approvedFxSource) return;
 
-  const sources = Array.isArray(context.sources) ? context.sources : [];
+  const sources = Array.isArray(context?.sources) ? context.sources : [];
+  const approvedSourceNote = approvedFxSource ? `
+    <div class="assumption">
+      <strong>Approved background</strong>
+      <span>${escapeHtml(formatApprovedSource(approvedFxSource))}</span>
+    </div>` : "";
 
   marketBox.innerHTML = `
     <div class="section-heading">
@@ -77,26 +82,41 @@ function renderMarketContext(context) {
         <p class="eyebrow">Current context</p>
         <h2>Source-based market brief</h2>
       </div>
-      ${context.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
+      ${context?.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
     </div>
 
-    ${context.assumption ? `
+    ${approvedSourceNote}
+
+    ${context?.assumption ? `
       <div class="assumption">
         <strong>Assumption</strong>
         <span>${escapeHtml(context.assumption)}</span>
       </div>` : ""}
 
     <div class="context-grid">
-      ${contextPart("Baseline", context.baseline)}
-      ${contextPart("Observed facts", context.observed)}
-      ${contextPart("What could change", context.watch)}
+      ${contextPart("Baseline", context?.baseline)}
+      ${contextPart("Observed facts", context?.observed)}
+      ${contextPart("What could change", context?.watch)}
     </div>
 
     ${renderSources(sources)}
-    <p class="caution">${escapeHtml(context.caution || "")}</p>
+    ${context?.caution ? `<p class="caution">${escapeHtml(context.caution)}</p>` : ""}
   `;
 
   marketBox.classList.remove("hidden");
+}
+
+function formatApprovedSource(source) {
+  const title = source.title || "FX report";
+  const period = source.periodStart && source.periodEnd
+    ? `${formatDate(source.periodStart)}–${formatDate(source.periodEnd)}`
+    : source.publicationDate
+      ? formatDate(source.publicationDate)
+      : "date not stated";
+  const pairs = Array.isArray(source.pairs) && source.pairs.length
+    ? ` Relevant section${source.pairs.length > 1 ? "s" : ""}: ${source.pairs.join(", ")}.`
+    : "";
+  return `${title}, ${period}.${pairs} Indicative, dated background; current conditions may have changed.`;
 }
 
 function renderSources(sources) {

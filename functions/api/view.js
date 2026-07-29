@@ -1,3 +1,5 @@
+import { getApprovedFxContext } from "../_shared/fx-reports.js";
+
 const OPENAI_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_ANSWER_MODEL = "gpt-5.6-terra";
 const DEFAULT_ANALYSIS_MODEL = "gpt-5.4-mini";
@@ -73,6 +75,15 @@ export async function onRequestPost({ request, env }) {
       DEFAULT_ANALYSIS_MODEL
     );
 
+    const approvedFx = await getApprovedFxContext({
+      env,
+      question: `${input.question} ${input.clientContext}`,
+      allowRefresh: true
+    }).catch((error) => {
+      console.error("Approved FX source error", error);
+      return { context: null, source: null, cacheStatus: "error" };
+    });
+
     const marketContext = input.useMarketContext
       ? await createMarketContext({ env, model: analysisModel, ...input })
       : null;
@@ -81,12 +92,17 @@ export async function onRequestPost({ request, env }) {
       env,
       model: answerModel,
       marketContext,
+      approvedFxContext: approvedFx.context,
       ...input
     });
 
     return json({
       answer,
       marketContext,
+      approvedFxSource: approvedFx.context ? {
+        ...approvedFx.source,
+        cacheStatus: approvedFx.cacheStatus
+      } : null,
       models: {
         answer: answerModel,
         analysis: input.useMarketContext ? analysisModel : null
@@ -179,11 +195,15 @@ async function createViewAnswer({
   question,
   clientContext,
   marketRegion,
-  marketContext
+  marketContext,
+  approvedFxContext
 }) {
   const context = marketContext
     ? JSON.stringify(pick(marketContext, ["assumption", "baseline", "observed", "watch", "asOf"]))
     : "No live context was requested. Do not invent current facts, figures or market consensus.";
+
+  const approvedContext = approvedFxContext ||
+    "No relevant approved FX report section was found. Do not imply that an institutional FX report was consulted.";
 
   const response = await openAI(env, {
     model,
@@ -224,8 +244,17 @@ Conversation rules:
           clientContext
         })}
 
-SOURCE-BASED CONTEXT:
+LIVE SOURCE-BASED CONTEXT:
 ${context}
+
+APPROVED INSTITUTIONAL BACKGROUND:
+${approvedContext}
+
+Source handling:
+- When approved institutional background is supplied and relevant, use it as the primary source for the baseline FX view.
+- Keep any dated report view clearly conditional and do not imply it is current beyond its stated period.
+- Live web context may update observed facts and developments, but it must not be described as an authorised bank view.
+- Do not mention the report title or source details in the spoken response unless natural and necessary. The interface will disclose the source separately.
 
 Create one suggested response for the junior banker.
 
