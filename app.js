@@ -46,10 +46,8 @@ form.addEventListener("submit", async (event) => {
       console.error("Approved FX report diagnostics", data.approvedFxStatus);
       statusBox.className = "status error";
       statusBox.textContent = `Response generated, but the approved FX report was not used: ${data.approvedFxStatus.error}`;
-    } else if (data.approvedFxSource) {
-      statusBox.textContent = `Ready — approved FX background used (${data.approvedFxStatus.status}).`;
     } else {
-      statusBox.textContent = `Ready — generated using ${data.models.answer}. No relevant approved FX section was used.`;
+      statusBox.textContent = "";
     }
     answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -80,7 +78,7 @@ function renderMarketContext(context, approvedFxSource) {
   const sources = Array.isArray(context?.sources) ? context.sources : [];
   const approvedSourceNote = approvedFxSource ? `
     <div class="assumption">
-      <strong>Approved background</strong>
+      <strong>Internal Guidance</strong>
       <span>${escapeHtml(formatApprovedSource(approvedFxSource))}</span>
     </div>` : "";
 
@@ -88,7 +86,7 @@ function renderMarketContext(context, approvedFxSource) {
     <div class="section-heading">
       <div>
         <p class="eyebrow">Current context</p>
-        <h2>Source-based market brief</h2>
+        <h2>Market Brief</h2>
       </div>
       ${context?.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
     </div>
@@ -115,16 +113,18 @@ function renderMarketContext(context, approvedFxSource) {
 }
 
 function formatApprovedSource(source) {
-  const title = source.title || "FX report";
   const period = source.periodStart && source.periodEnd
-    ? `${formatDate(source.periodStart)}–${formatDate(source.periodEnd)}`
+    ? `${formatDate(source.periodStart)} - ${formatDate(source.periodEnd)}`
     : source.publicationDate
       ? formatDate(source.publicationDate)
       : "date not stated";
-  const pairs = Array.isArray(source.pairs) && source.pairs.length
+  const sections = Array.isArray(source.pairs) && source.pairs.length
     ? ` Relevant section${source.pairs.length > 1 ? "s" : ""}: ${source.pairs.join(", ")}.`
     : "";
-  return `${title}, ${period}.${pairs} Indicative, dated background; current conditions may have changed.`;
+  const background = source.backgroundSummary
+    ? ` ${source.backgroundSummary}`
+    : "";
+  return `Guidance from ${period}.${sections}${background}`;
 }
 
 function renderSources(sources) {

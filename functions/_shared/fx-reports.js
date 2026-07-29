@@ -70,7 +70,7 @@ export async function getApprovedFxContext({ env, question, allowRefresh = true 
 
   return {
     context: formatApprovedContext(result.report, selected),
-    source: sourceSummary(result.report, result.source, selected.map((item) => item.pair)),
+    source: sourceSummary(result.report, result.source, selected.map((item) => item.pair), selected),
     cacheStatus: result.status
   };
 }
@@ -331,7 +331,7 @@ What could change it: ${(item.changeFactors || []).join("; ") || "Not stated."}
 Possible business implications: ${(item.possibleBusinessImplications || []).join("; ") || "Not stated."}
 Key levels: ${item.keyLevelsSummary || "Not stated."}`).join("\n\n");
 
-  return `APPROVED FX REPORT BACKGROUND
+  return `INTERNAL FX GUIDANCE
 Title: ${header.title || "FX report"}
 Publication date: ${header.publicationDate || "Not stated"}
 Stated period: ${header.periodStart || "Not stated"} to ${header.periodEnd || "Not stated"}
@@ -339,14 +339,25 @@ Stated period: ${header.periodStart || "Not stated"} to ${header.periodEnd || "N
 ${pairText}
 
 Usage rules:
-- Treat this as dated, approved background, not timeless fact.
+- Treat this as internal guidance for the stated report period.
 - Attribute any institutional view to the report, not to yourself.
 - Do not present your own inference as an official bank view.
 - Do not invent figures or extend the report beyond what it says.
-- Where the period has passed, state that current conditions should be checked.`;
+- Use the report dates to make the timing of the guidance clear.`;
 }
 
-function sourceSummary(report, source, pairs = []) {
+function sourceSummary(report, source, pairs = [], sections = []) {
+  const backgroundSummary = sections
+    .map((section) => {
+      const pair = section?.pair ? `${section.pair}: ` : "";
+      const movement = clean(section?.recentMovement || "", 240);
+      const view = clean(section?.baselineView || "", 320);
+      if (movement && view) return `${pair}${movement} ${view}`;
+      return `${pair}${view || movement}`.trim();
+    })
+    .filter(Boolean)
+    .join(" ");
+
   return {
     title: report?.report?.title || "FX report",
     publicationDate: report?.report?.publicationDate || "",
@@ -354,7 +365,8 @@ function sourceSummary(report, source, pairs = []) {
     periodEnd: report?.report?.periodEnd || "",
     sourceKey: source?.key || report?.source?.key || "",
     processedAt: report?.source?.processedAt || "",
-    pairs
+    pairs,
+    backgroundSummary
   };
 }
 
