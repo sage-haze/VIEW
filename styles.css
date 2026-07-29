@@ -65,9 +65,63 @@ input:focus, textarea:focus {
   gap: 16px;
 }
 
-.checkbox { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; }
-.checkbox input { width: auto; margin-top: 5px; }
-.checkbox small { display: block; }
+.source-options {
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 0;
+}
+
+.source-options legend {
+  margin-bottom: 2px;
+  font-weight: 800;
+}
+
+.field-help {
+  margin: 0 0 10px;
+  color: #657086;
+  font-size: .92rem;
+}
+
+.source-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 8px;
+  padding: 12px 14px;
+  border: 1px solid #d7dfeb;
+  border-radius: 11px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.source-option:has(input:checked) {
+  border-color: #2a4cb7;
+  background: #f5f7ff;
+  box-shadow: 0 0 0 2px rgba(42, 76, 183, .08);
+}
+
+.source-option input {
+  width: auto;
+  margin: 5px 0 0;
+  accent-color: #243f9d;
+}
+
+.source-option span,
+.source-option strong,
+.source-option small {
+  display: block;
+}
+
+.source-option strong { color: #172033; }
+.source-option small { margin-top: 2px; line-height: 1.4; }
+
+.source-unavailable {
+  border-color: #ecd69b;
+  background: #fffaf0;
+}
+
+.source-unavailable h2 { font-size: 1.15rem; }
+.source-unavailable p { margin-bottom: 0; }
 
 button {
   border-radius: 11px;

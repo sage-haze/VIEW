@@ -149,3 +149,14 @@ The endpoint expects exactly one PDF under `source/`. Anyone who can access the 
 FX report extraction now uses schema version 3. Each currency pair is rewritten once, during PDF processing, using the corporate-market-commentary writing guide. The processed JSON also records the report's displayed movement guidance, including the source label/symbol and a normalized direction and strength.
 
 After deploying this version, use the FX Report Manager to **Force rebuild** the current report. Existing schema-version-2 JSON will also be treated as stale and rebuilt automatically. The learner page reads `sourceFaithfulCommentary` directly rather than asking the answer model to paraphrase the report for the Internal Guidance panel.
+
+
+## Reference choices
+
+The learner page offers three source modes:
+
+- **Internal guidance and market sources**: uses relevant content from the processed R2 report and current web search.
+- **Internal guidance only**: uses no web search. If the report does not contain a relevant currency section, the page asks the user to select another source.
+- **Market sources only**: uses current web search and does not read or display the internal FX guidance.
+
+The selected mode is preserved when the user generates another VIEW response.

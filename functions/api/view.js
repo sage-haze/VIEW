@@ -55,7 +55,7 @@ export async function onRequestPost({ request, env }) {
       question: clean(body.question, 1500),
       clientContext: clean(body.clientContext, 1000),
       marketRegion: clean(body.marketRegion, 120),
-      useMarketContext: Boolean(body.useMarketContext),
+      sourceMode: normaliseSourceMode(body.sourceMode),
       alternativeRequest: Boolean(body.alternativeRequest),
       previousResponse: clean(body.previousResponse, 1800),
       reusedMarketContext: normaliseReusedMarketContext(body.reusedMarketContext)
@@ -78,24 +78,47 @@ export async function onRequestPost({ request, env }) {
       DEFAULT_ANALYSIS_MODEL
     );
 
-    const approvedFx = await getApprovedFxContext({
-      env,
-      question: `${input.question} ${input.clientContext}`,
-      allowRefresh: true
-    }).catch((error) => {
-      console.error("Approved FX source error", error);
-      return {
-        context: null,
-        source: null,
-        cacheStatus: "error",
-        error: error.publicMessage || error.message || "Unable to process the approved FX report.",
-        diagnostics: error.diagnostics || null
-      };
-    });
+    const usesInternalGuidance = input.sourceMode !== "market";
+    const usesMarketSources = input.sourceMode !== "internal";
 
-    const marketContext = input.reusedMarketContext || (input.useMarketContext
-      ? await createMarketContext({ env, model: analysisModel, ...input })
-      : null);
+    const approvedFx = usesInternalGuidance
+      ? await getApprovedFxContext({
+          env,
+          question: `${input.question} ${input.clientContext}`,
+          allowRefresh: true
+        }).catch((error) => {
+          console.error("Approved FX source error", error);
+          return {
+            context: null,
+            source: null,
+            cacheStatus: "error",
+            error: error.publicMessage || error.message || "Unable to process the internal FX guidance.",
+            diagnostics: error.diagnostics || null
+          };
+        })
+      : { context: null, source: null, cacheStatus: "not-requested", error: null, diagnostics: null };
+
+    if (input.sourceMode === "internal" && !approvedFx.context) {
+      return json({
+        answer: null,
+        marketContext: null,
+        approvedFxSource: null,
+        sourceUnavailable: {
+          message: "Internal guidance is not available for this question. Please select another source."
+        },
+        approvedFxStatus: {
+          status: approvedFx.cacheStatus,
+          used: false,
+          error: approvedFx.error || null,
+          diagnostics: approvedFx.diagnostics || null
+        },
+        models: { answer: null, analysis: null }
+      });
+    }
+
+    const marketContext = usesMarketSources
+      ? (input.reusedMarketContext || await createMarketContext({ env, model: analysisModel, ...input }))
+      : null;
 
     const answer = await createViewAnswer({
       env,
@@ -120,7 +143,7 @@ export async function onRequestPost({ request, env }) {
       },
       models: {
         answer: answerModel,
-        analysis: input.useMarketContext && !input.reusedMarketContext ? analysisModel : null
+        analysis: usesMarketSources && !input.reusedMarketContext ? analysisModel : null
       }
     });
   } catch (error) {
@@ -135,6 +158,10 @@ export async function onRequestPost({ request, env }) {
   }
 }
 
+
+function normaliseSourceMode(value) {
+  return ["combined", "internal", "market"].includes(value) ? value : "combined";
+}
 
 function normaliseReusedMarketContext(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -237,7 +264,7 @@ async function createViewAnswer({
 }) {
   const context = marketContext
     ? JSON.stringify(pick(marketContext, ["assumption", "baseline", "observed", "watch", "asOf"]))
-    : "No live context was requested. Do not invent current facts, figures or market consensus.";
+    : "No current market-source context was requested. Do not invent current facts, figures or market consensus.";
 
   const approvedContext = approvedFxContext ||
     "No relevant approved FX report section was found. Do not imply that an institutional FX report was consulted.";
@@ -253,10 +280,10 @@ async function createViewAnswer({
 The banker is building rapport, not trying to sound like a market expert. The response should feel polished but attainable: something a capable junior could understand, adapt and say comfortably after brief preparation. Take the client’s question at face value and treat it as a genuine invitation to share a useful thought. Assume there may be a personal, business or financial reason behind the question, but do not guess what that reason is, overstate its importance or assume the client already holds a particular market view.
 
 Use VIEW as an internal guide:
-- V: Give a simple and direct initial view in everyday language.
-- I: Mention one important thing that could change the picture.
-- E: Explain one practical way the topic could matter, using conditional language where the relevance is not yet clear.
-- W: End with one friendly, topic-specific question that gently explores how the subject may connect to the client.
+- V — Give a baseline view: Offer a simple and direct starting point in everyday language.
+- I — Identify what may change the view: Mention one or two important uncertainties or conditions to watch.
+- E — Explain possible implications: Translate the issue into possible practical relevance, using conditional language where the relevance is not yet clear.
+- W — Welcome what matters to the client: Bridge from the general implications to the client’s situation, then end with one friendly, topic-specific question that offers useful possibilities while leaving room for something else.
 
 Conversation rules:
 - Answer before asking a question.

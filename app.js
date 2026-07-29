@@ -2,7 +2,7 @@ const form = document.querySelector("#viewForm");
 const questionInput = document.querySelector("#question");
 const regionInput = document.querySelector("#marketRegion");
 const contextInput = document.querySelector("#clientContext");
-const marketToggle = document.querySelector("#useMarketContext");
+const sourceInputs = [...document.querySelectorAll('input[name="referenceSource"]')];
 const submitButton = document.querySelector("#submitButton");
 const statusBox = document.querySelector("#status");
 const marketBox = document.querySelector("#marketContext");
@@ -20,16 +20,19 @@ form.addEventListener("submit", async (event) => {
   resetOutput();
   setLoading(true);
 
-  statusBox.textContent = marketToggle.checked
-    ? "Checking current context and preparing a suggested response…"
-    : "Preparing a suggested response…";
+  const sourceMode = selectedSourceMode();
+  statusBox.textContent = sourceMode === "internal"
+    ? "Checking internal guidance and preparing a suggested response…"
+    : sourceMode === "market"
+      ? "Checking current market sources and preparing a suggested response…"
+      : "Checking internal guidance and current market sources…";
 
   try {
     lastRequest = {
       question,
       marketRegion: regionInput.value.trim(),
       clientContext: contextInput.value.trim(),
-      useMarketContext: marketToggle.checked
+      sourceMode
     };
 
     const response = await fetch("/api/view", {
@@ -47,7 +50,11 @@ form.addEventListener("submit", async (event) => {
 
     lastResult = data;
     renderMarketContext(data.marketContext, data.approvedFxSource);
-    renderAnswer(data.answer);
+    if (data.sourceUnavailable?.message) {
+      renderSourceUnavailable(data.sourceUnavailable.message);
+    } else {
+      renderAnswer(data.answer);
+    }
     if (data.approvedFxStatus?.error) {
       console.error("Approved FX report diagnostics", data.approvedFxStatus);
       statusBox.className = "status error";
@@ -64,6 +71,19 @@ form.addEventListener("submit", async (event) => {
     setLoading(false);
   }
 });
+
+function selectedSourceMode() {
+  return sourceInputs.find((input) => input.checked)?.value || "combined";
+}
+
+function renderSourceUnavailable(message) {
+  answersBox.innerHTML = `
+    <article class="panel source-unavailable" role="status">
+      <h2>Internal guidance not available</h2>
+      <p>${escapeHtml(message)}</p>
+    </article>
+  `;
+}
 
 function resetOutput() {
   statusBox.className = "status";
@@ -214,10 +234,10 @@ function renderAnswer(answer) {
       </div>
       <div class="thai-translation hidden" data-thai-translation lang="th" aria-live="polite"></div>
       <div class="view-grid">
-        ${viewPart("V — Baseline view", answer.view)}
-        ${viewPart("I — What may change it", answer.influences)}
-        ${viewPart("E — Why it may matter", answer.effects)}
-        ${viewPart("W — Friendly follow-up", answer.whatMatters)}
+        ${viewPart("V — Give a baseline view", answer.view)}
+        ${viewPart("I — Identify what may change the view", answer.influences)}
+        ${viewPart("E — Explain possible implications", answer.effects)}
+        ${viewPart("W — Welcome what matters to the client", answer.whatMatters)}
       </div>
       <details class="coach-details">
         <summary>Coaching notes and shorter version</summary>
@@ -259,7 +279,6 @@ async function generateAlternative(button, previousResponse) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...lastRequest,
-        useMarketContext: false,
         reusedMarketContext: lastResult.marketContext,
         alternativeRequest: true,
         previousResponse
