@@ -90,3 +90,37 @@ Confirm that these are true:
 The cache is considered current only when both the source key and source PDF etag match the values saved in the JSON. Replacing a PDF with a revised file under the same filename therefore triggers a rebuild.
 
 The report is supplied to the answer model only when the question mentions a supported pair or currency, including USDTHB, EURUSD, GBPUSD, AUDUSD, USDJPY and USDCNY. Broad foreign-exchange questions can use all available pair sections.
+
+## R2 troubleshooting
+
+`/api/health` now lists the exact object keys visible under `source/` and `processed/`.
+The PDF key must begin with `source/`, for example `source/FX Compass.pdf`.
+The dashboard's folders are prefixes; creating an empty folder alone does not put the PDF inside it.
+
+The learner endpoint now reports an extraction error in the page status instead of silently falling back to web context.
+For a deliberate refresh, configure `FX_REFRESH_TOKEN` and call the admin POST endpoint.
+
+## Web-only FX Report Manager
+
+Open:
+
+```
+/admin/fx-report.html
+```
+
+This page is intended for the site owner. It lets you:
+
+- save the `FX_REFRESH_TOKEN` in the current browser;
+- check whether the source PDF and processed JSON are current;
+- process or force-rebuild the existing PDF;
+- upload a replacement PDF directly from the browser.
+
+When a new PDF is uploaded through the manager, the application:
+
+1. writes it to `source/<filename>.pdf`;
+2. deletes other files under `source/`;
+3. deletes prior files under `processed/`;
+4. extracts the new PDF;
+5. writes `processed/<filename>.json`.
+
+The upload accepts PDFs up to 20 MB. Do not place the refresh token in source code. Configure it as the Cloudflare Pages secret `FX_REFRESH_TOKEN`; the manager stores the entered value only in that browser's local storage.

@@ -81,7 +81,13 @@ export async function onRequestPost({ request, env }) {
       allowRefresh: true
     }).catch((error) => {
       console.error("Approved FX source error", error);
-      return { context: null, source: null, cacheStatus: "error" };
+      return {
+        context: null,
+        source: null,
+        cacheStatus: "error",
+        error: error.publicMessage || error.message || "Unable to process the approved FX report.",
+        diagnostics: error.diagnostics || null
+      };
     });
 
     const marketContext = input.useMarketContext
@@ -103,6 +109,12 @@ export async function onRequestPost({ request, env }) {
         ...approvedFx.source,
         cacheStatus: approvedFx.cacheStatus
       } : null,
+      approvedFxStatus: {
+        status: approvedFx.cacheStatus,
+        used: Boolean(approvedFx.context),
+        error: approvedFx.error || null,
+        diagnostics: approvedFx.diagnostics || null
+      },
       models: {
         answer: answerModel,
         analysis: input.useMarketContext ? analysisModel : null

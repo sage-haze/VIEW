@@ -301,3 +301,72 @@ footer { color: #657086; font-size: .85rem; padding: 18px 4px; }
   color: #a12626;
   border-left-color: #d7a4a4;
 }
+
+/* FX report manager */
+.admin-container { width: min(900px, calc(100% - 32px)); }
+.admin-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.admin-hero h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
+.admin-hero p:last-child { max-width: 650px; color: #566178; }
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #aebbd0;
+  background: #fff;
+  color: #243f9d;
+  text-decoration: none;
+  border-radius: 11px;
+  padding: 11px 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.secondary-button:hover { background: #f4f6fb; }
+.helper-text { color: #657086; }
+.token-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.admin-status-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #d9e1ec;
+  background: #f7f9fc;
+  border-radius: 12px;
+  padding: 16px;
+  color: #4f5d73;
+}
+.admin-status-card strong { color: #172033; }
+.admin-status-card.success { border-color: #a7d7ba; background: #f0faf4; }
+.admin-status-card.success strong, .status.success { color: #17653a; }
+.admin-status-card.warning { border-color: #e9cf8f; background: #fff9e9; }
+.admin-status-card.warning strong { color: #835d00; }
+.admin-status-card.error { border-color: #e5b0b0; background: #fff3f3; }
+.admin-status-card.error strong, .status.error { color: #a12626; }
+.button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.upload-form { margin-top: 16px; }
+.file-drop {
+  display: grid;
+  gap: 4px;
+  border: 2px dashed #b8c5d8;
+  border-radius: 14px;
+  padding: 22px;
+  background: #f8faff;
+  cursor: pointer;
+}
+.file-drop:hover { border-color: #647bb7; }
+.file-drop-title { color: #172033; font-weight: 800; }
+.file-drop-detail { color: #657086; font-weight: 500; }
+.file-drop input { margin-top: 10px; padding: 10px; background: #fff; }
+.admin-notes ol { margin-bottom: 0; padding-left: 1.4rem; }
+.admin-link { margin-top: .5rem; text-align: center; font-size: .9rem; }
+.admin-link a { color: #566178; font-weight: 700; }
+code { background: #eef2f8; border-radius: 5px; padding: .1em .35em; }
+
+@media (max-width: 650px) {
+  .admin-hero { display: block; }
+  .admin-hero .secondary-button { margin-top: 16px; }
+  .token-row { grid-template-columns: 1fr; }
+  .button-row > * { width: 100%; }
+}

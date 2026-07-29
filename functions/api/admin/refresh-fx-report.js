@@ -1,8 +1,9 @@
 import { getOrRefreshFxReport } from "../../_shared/fx-reports.js";
+import { authoriseAdmin, errorResponse } from "../../_shared/admin-auth.js";
 
 export async function onRequestPost({ request, env }) {
   try {
-    authorise(request, env);
+    authoriseAdmin(request, env);
     const url = new URL(request.url);
     const force = url.searchParams.get("force") === "1";
     const result = await getOrRefreshFxReport({ env, allowRefresh: true, force });
@@ -13,30 +14,17 @@ export async function onRequestPost({ request, env }) {
       sourcePdf: result.source?.key || null,
       sourceEtag: result.source?.etag || null,
       processedJson: result.processedKey || null,
-      report: result.report ? {
-        title: result.report.report?.title || null,
-        periodStart: result.report.report?.periodStart || null,
-        periodEnd: result.report.report?.periodEnd || null,
-        processedAt: result.report.source?.processedAt || null,
-        extractionModel: result.report.source?.extractionModel || null
-      } : null
+      report: reportSummary(result.report)
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("FX refresh error", error);
-    return Response.json({
-      ok: false,
-      error: error.publicMessage || error.message || "Unable to refresh the FX report.",
-      diagnostics: error.diagnostics || null
-    }, {
-      status: error.status || 500,
-      headers: { "Cache-Control": "no-store" }
-    });
+    return errorResponse(error, "Unable to refresh the FX report.");
   }
 }
 
 export async function onRequestGet({ request, env }) {
   try {
-    authorise(request, env);
+    authoriseAdmin(request, env);
     const result = await getOrRefreshFxReport({ env, allowRefresh: false });
     return Response.json({
       ok: true,
@@ -44,28 +32,22 @@ export async function onRequestGet({ request, env }) {
       sourcePdf: result.source?.key || null,
       sourceEtag: result.source?.etag || null,
       processedJson: result.processedKey || null,
-      cachedReportAvailable: Boolean(result.report)
+      cachedReportAvailable: Boolean(result.report),
+      report: reportSummary(result.report)
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return Response.json({ ok: false, error: error.publicMessage || error.message }, {
-      status: error.status || 500,
-      headers: { "Cache-Control": "no-store" }
-    });
+    return errorResponse(error, "Unable to check the FX report status.");
   }
 }
 
-function authorise(request, env) {
-  const expected = env.FX_REFRESH_TOKEN;
-  if (!expected) {
-    const error = new Error("FX_REFRESH_TOKEN is not configured.");
-    error.status = 500;
-    throw error;
-  }
-
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
-  if (supplied !== expected) {
-    const error = new Error("Not authorised.");
-    error.status = 401;
-    throw error;
-  }
+function reportSummary(report) {
+  if (!report) return null;
+  return {
+    title: report.report?.title || null,
+    periodStart: report.report?.periodStart || null,
+    periodEnd: report.report?.periodEnd || null,
+    publicationDate: report.report?.publicationDate || null,
+    processedAt: report.source?.processedAt || null,
+    extractionModel: report.source?.extractionModel || null
+  };
 }

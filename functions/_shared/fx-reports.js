@@ -134,26 +134,32 @@ async function extractAndStore({ env, source, processedKey }) {
   if (!pdfObject) throw publicError("The source PDF disappeared before it could be processed.", 409);
 
   const bytes = await pdfObject.arrayBuffer();
-  const base64 = arrayBufferToBase64(bytes);
   const model = clean(env.OPENAI_EXTRACTION_MODEL, 120) ||
     clean(env.OPENAI_ANALYSIS_MODEL, 120) || DEFAULT_EXTRACTION_MODEL;
 
-  const response = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model,
-      reasoning: { effort: "low" },
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: `Extract the attached approved FX report into the required JSON structure.
+  // Upload the PDF first instead of embedding a large base64 string in the
+  // Responses request. This is more reliable in Pages Functions and makes
+  // extraction failures easier to diagnose.
+  const filename = source.key.split("/").pop() || "fx-report.pdf";
+  const uploadedFile = await uploadOpenAIFile({ env, bytes, filename });
+
+  try {
+    const response = await fetch(OPENAI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: "low" },
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: `Extract the attached approved FX report into the required JSON structure.
 
 Rules:
 - Use only information actually present in the document.
@@ -164,70 +170,130 @@ Rules:
 - Summarise levels rather than inventing missing values.
 - Use an empty string or empty array where the document does not provide an item.
 - Do not add current web information or your own market view.`
-            }
-          ]
+              }
+            ]
+          },
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: "Process this document for use as an approved background source." },
+              { type: "input_file", file_id: uploadedFile.id }
+            ]
+          }
+        ],
+        text: {
+          verbosity: "medium",
+          format: {
+            type: "json_schema",
+            name: "fx_report",
+            strict: true,
+            schema: FX_REPORT_SCHEMA
+          }
         },
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: "Process this document for use as an approved background source." },
-            {
-              type: "input_file",
-              filename: source.key.split("/").pop() || "fx-report.pdf",
-              file_data: base64
-            }
-          ]
-        }
-      ],
-      text: {
-        verbosity: "medium",
-        format: {
-          type: "json_schema",
-          name: "fx_report",
-          strict: true,
-          schema: FX_REPORT_SCHEMA
-        }
-      },
-      max_output_tokens: 7000,
-      store: false
-    })
-  });
+        max_output_tokens: 7000,
+        store: false
+      })
+    });
 
+    const data = await response.json().catch(() => ({}));
+    const requestId = response.headers.get("x-request-id");
+    if (!response.ok) {
+      const error = publicError(
+        data?.error?.message || `OpenAI extraction failed with status ${response.status}.`,
+        response.status
+      );
+      error.diagnostics = {
+        stage: "extract-response",
+        requestId,
+        code: data?.error?.code || null,
+        type: data?.error?.type || null,
+        sourceKey: source.key,
+        extractionModel: model
+      };
+      throw error;
+    }
+
+    let extracted;
+    try {
+      extracted = JSON.parse(outputText(data));
+    } catch (cause) {
+      const error = publicError("The FX report was read, but the structured JSON could not be parsed.", 502);
+      error.diagnostics = {
+        stage: "parse-extraction",
+        requestId,
+        sourceKey: source.key,
+        extractionModel: model,
+        cause: cause?.message || String(cause)
+      };
+      throw error;
+    }
+
+    const stored = {
+      schemaVersion: 1,
+      source: {
+        key: source.key,
+        etag: source.etag,
+        version: source.version,
+        uploaded: source.uploaded?.toISOString?.() || String(source.uploaded || ""),
+        processedAt: new Date().toISOString(),
+        extractionModel: model
+      },
+      ...extracted
+    };
+
+    await env.FX_REPORTS.put(processedKey, JSON.stringify(stored, null, 2), {
+      httpMetadata: { contentType: "application/json; charset=utf-8" },
+      customMetadata: {
+        sourcePdfKey: source.key,
+        sourcePdfEtag: source.etag,
+        schemaVersion: "1"
+      }
+    });
+
+    return stored;
+  } finally {
+    await deleteOpenAIFile(env, uploadedFile.id);
+  }
+}
+
+async function uploadOpenAIFile({ env, bytes, filename }) {
+  const form = new FormData();
+  form.append("purpose", "user_data");
+  form.append("file", new Blob([bytes], { type: "application/pdf" }), filename);
+
+  const response = await fetch("https://api.openai.com/v1/files", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    body: form
+  });
   const data = await response.json().catch(() => ({}));
-  const requestId = response.headers.get("x-request-id");
-  if (!response.ok) {
+  if (!response.ok || !data?.id) {
     const error = publicError(
-      data?.error?.message || `OpenAI extraction failed with status ${response.status}.`,
-      response.status
+      data?.error?.message || `OpenAI file upload failed with status ${response.status}.`,
+      response.status || 502
     );
-    error.diagnostics = { requestId, code: data?.error?.code || null };
+    error.diagnostics = {
+      stage: "upload-pdf",
+      requestId: response.headers.get("x-request-id"),
+      code: data?.error?.code || null,
+      type: data?.error?.type || null,
+      filename
+    };
     throw error;
   }
+  return data;
+}
 
-  const extracted = JSON.parse(outputText(data));
-  const stored = {
-    schemaVersion: 1,
-    source: {
-      key: source.key,
-      etag: source.etag,
-      version: source.version,
-      uploaded: source.uploaded?.toISOString?.() || String(source.uploaded || ""),
-      processedAt: new Date().toISOString(),
-      extractionModel: model
-    },
-    ...extracted
-  };
-
-  await env.FX_REPORTS.put(processedKey, JSON.stringify(stored, null, 2), {
-    httpMetadata: { contentType: "application/json; charset=utf-8" },
-    customMetadata: {
-      sourcePdfKey: source.key,
-      sourcePdfEtag: source.etag,
-      schemaVersion: "1"
-    }
-  });
-
-  return stored;
+async function deleteOpenAIFile(env, fileId) {
+  if (!fileId) return;
+  try {
+    await fetch(`https://api.openai.com/v1/files/${encodeURIComponent(fileId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` }
+    });
+  } catch (error) {
+    console.warn("Unable to delete temporary OpenAI file", error);
+  }
 }
 
 function selectRelevantSections(question, report) {

@@ -42,7 +42,15 @@ form.addEventListener("submit", async (event) => {
 
     renderMarketContext(data.marketContext, data.approvedFxSource);
     renderAnswer(data.answer);
-    statusBox.textContent = `Ready — generated using ${data.models.answer}.`;
+    if (data.approvedFxStatus?.error) {
+      console.error("Approved FX report diagnostics", data.approvedFxStatus);
+      statusBox.className = "status error";
+      statusBox.textContent = `Response generated, but the approved FX report was not used: ${data.approvedFxStatus.error}`;
+    } else if (data.approvedFxSource) {
+      statusBox.textContent = `Ready — approved FX background used (${data.approvedFxStatus.status}).`;
+    } else {
+      statusBox.textContent = `Ready — generated using ${data.models.answer}. No relevant approved FX section was used.`;
+    }
     answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     console.error(error);
