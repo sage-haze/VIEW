@@ -8,6 +8,9 @@ const statusBox = document.querySelector("#status");
 const marketBox = document.querySelector("#marketContext");
 const answersBox = document.querySelector("#answers");
 
+let lastRequest = null;
+let lastResult = null;
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -22,15 +25,17 @@ form.addEventListener("submit", async (event) => {
     : "Preparing a suggested response…";
 
   try {
+    lastRequest = {
+      question,
+      marketRegion: regionInput.value.trim(),
+      clientContext: contextInput.value.trim(),
+      useMarketContext: marketToggle.checked
+    };
+
     const response = await fetch("/api/view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        marketRegion: regionInput.value.trim(),
-        clientContext: contextInput.value.trim(),
-        useMarketContext: marketToggle.checked
-      })
+      body: JSON.stringify(lastRequest)
     });
 
     const data = await response.json().catch(() => ({}));
@@ -40,6 +45,7 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.error || `Request failed (${response.status}).`);
     }
 
+    lastResult = data;
     renderMarketContext(data.marketContext, data.approvedFxSource);
     renderAnswer(data.answer);
     if (data.approvedFxStatus?.error) {
@@ -135,8 +141,11 @@ function renderInternalGuidance(source) {
   return `
     <section class="internal-guidance" aria-label="Internal guidance">
       <div class="guidance-heading">
-        <strong>Internal Guidance</strong>
-        <span>Guidance from ${escapeHtml(period)}</span>
+        <div>
+          <strong>Internal Guidance</strong>
+          <span>Guidance from ${escapeHtml(period)}</span>
+        </div>
+        ${source.sourceKey ? `<a class="guidance-download" href="/api/fx-report/download" target="_blank" rel="noopener">Download PDF</a>` : ""}
       </div>
       ${guidanceRows || `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
     </section>`;
@@ -198,6 +207,10 @@ function renderAnswer(answer) {
           ${viewPart("What should be verified", answer.verificationNeeded)}
         </div>
       </details>
+      <div class="alternative-actions">
+        <p>VIEW is a guide, not a script. The same market context can be expressed in different natural ways.</p>
+        <button class="secondary-button" type="button" data-generate-alternative>Generate another VIEW response</button>
+      </div>
     </article>
   `;
 
@@ -208,6 +221,44 @@ function renderAnswer(answer) {
     output: translationBox,
     text: answer.response
   }));
+
+  const alternativeButton = answersBox.querySelector("[data-generate-alternative]");
+  alternativeButton?.addEventListener("click", () => generateAlternative(alternativeButton, answer.response));
+}
+
+async function generateAlternative(button, previousResponse) {
+  if (!lastRequest || !lastResult) return;
+
+  const originalLabel = "Generate another VIEW response";
+  button.disabled = true;
+  button.textContent = "Generating another response…";
+
+  try {
+    const response = await fetch("/api/view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...lastRequest,
+        useMarketContext: false,
+        reusedMarketContext: lastResult.marketContext,
+        alternativeRequest: true,
+        previousResponse
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.answer) {
+      throw new Error(data.error || "Unable to generate another response.");
+    }
+
+    lastResult = { ...lastResult, answer: data.answer };
+    renderAnswer(data.answer);
+    answersBox.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = originalLabel;
+    statusBox.className = "status error";
+    statusBox.textContent = error.message || "Unable to generate another response.";
+  }
 }
 
 async function translateToThai({ button, output, text }) {

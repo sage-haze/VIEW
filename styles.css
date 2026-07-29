@@ -409,3 +409,56 @@ code { background: #eef2f8; border-radius: 5px; padding: .1em .35em; }
   .token-row { grid-template-columns: 1fr; }
   .button-row > * { width: 100%; }
 }
+
+.guidance-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.guidance-download {
+  white-space: nowrap;
+  font-size: .84rem;
+  font-weight: 700;
+  color: #243f9d;
+  text-decoration: none;
+  border: 1px solid rgba(36, 63, 157, .25);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, .7);
+}
+
+.guidance-download:hover { text-decoration: underline; }
+
+.alternative-actions {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid #e1e7f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.alternative-actions p {
+  margin: 0;
+  color: #566178;
+  font-size: .9rem;
+  max-width: 620px;
+}
+
+.secondary-button {
+  border: 1px solid #243f9d;
+  background: white;
+  color: #243f9d;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.secondary-button:hover { background: #f4f6ff; }
+
+@media (max-width: 700px) {
+  .alternative-actions { align-items: stretch; flex-direction: column; }
+  .secondary-button { width: 100%; white-space: normal; }
+}

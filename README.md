@@ -129,3 +129,17 @@ The upload accepts PDFs up to 20 MB. Do not place the refresh token in source co
 ## Internal Guidance display
 
 Processed reports now use schema version 2. The first request after deployment will rebuild an older cached JSON so each relevant currency pair includes a short plain-English summary for the learner-facing Internal Guidance panel.
+
+## Alternative VIEW responses
+
+The answer panel includes **Generate another VIEW response**. It reuses the same market brief and approved FX context, so it does not repeat the web-search step. The answer model is asked to keep the same underlying direction while using meaningfully different, junior-attainable wording. This demonstrates that VIEW is a guide rather than a fixed script.
+
+## Downloading the internal guidance PDF
+
+When internal FX guidance is used, the Market Brief shows a **Download PDF** link. The link streams the single PDF currently stored under `source/` through:
+
+```text
+/api/fx-report/download
+```
+
+The endpoint expects exactly one PDF under `source/`. Anyone who can access the deployed endpoint can download the report, so protect the site with the same access controls appropriate for the internal document.

@@ -55,7 +55,10 @@ export async function onRequestPost({ request, env }) {
       question: clean(body.question, 1500),
       clientContext: clean(body.clientContext, 1000),
       marketRegion: clean(body.marketRegion, 120),
-      useMarketContext: Boolean(body.useMarketContext)
+      useMarketContext: Boolean(body.useMarketContext),
+      alternativeRequest: Boolean(body.alternativeRequest),
+      previousResponse: clean(body.previousResponse, 1800),
+      reusedMarketContext: normaliseReusedMarketContext(body.reusedMarketContext)
     };
 
     if (!input.question) {
@@ -90,9 +93,9 @@ export async function onRequestPost({ request, env }) {
       };
     });
 
-    const marketContext = input.useMarketContext
+    const marketContext = input.reusedMarketContext || (input.useMarketContext
       ? await createMarketContext({ env, model: analysisModel, ...input })
-      : null;
+      : null);
 
     const answer = await createViewAnswer({
       env,
@@ -117,7 +120,7 @@ export async function onRequestPost({ request, env }) {
       },
       models: {
         answer: answerModel,
-        analysis: input.useMarketContext ? analysisModel : null
+        analysis: input.useMarketContext && !input.reusedMarketContext ? analysisModel : null
       }
     });
   } catch (error) {
@@ -130,6 +133,26 @@ export async function onRequestPost({ request, env }) {
       error.status || 500
     );
   }
+}
+
+
+function normaliseReusedMarketContext(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = {
+    assumption: clean(value.assumption, 500),
+    baseline: clean(value.baseline, 800),
+    observed: clean(value.observed, 1000),
+    watch: clean(value.watch, 800),
+    asOf: clean(value.asOf, 20),
+    caution: clean(value.caution, 300),
+    sources: Array.isArray(value.sources)
+      ? value.sources.slice(0, 8).map((item) => ({
+          title: clean(item?.title, 300),
+          url: clean(item?.url, 1200)
+        })).filter((item) => item.url)
+      : []
+  };
+  return result.baseline || result.observed || result.watch ? result : null;
 }
 
 async function createMarketContext({
@@ -208,7 +231,9 @@ async function createViewAnswer({
   clientContext,
   marketRegion,
   marketContext,
-  approvedFxContext
+  approvedFxContext,
+  alternativeRequest,
+  previousResponse
 }) {
   const context = marketContext
     ? JSON.stringify(pick(marketContext, ["assumption", "baseline", "observed", "watch", "asOf"]))
@@ -225,7 +250,7 @@ async function createViewAnswer({
         role: "system",
         content: `You are helping a friendly junior banker with about one to two years of experience respond to a client.
 
-The banker is building rapport, not trying to sound like a market expert. Take the client’s question at face value and treat it as a genuine invitation to share a useful thought. Assume there may be a personal, business or financial reason behind the question, but do not guess what that reason is, overstate its importance or assume the client already holds a particular market view.
+The banker is building rapport, not trying to sound like a market expert. The response should feel polished but attainable: something a capable junior could understand, adapt and say comfortably after brief preparation. Take the client’s question at face value and treat it as a genuine invitation to share a useful thought. Assume there may be a personal, business or financial reason behind the question, but do not guess what that reason is, overstate its importance or assume the client already holds a particular market view.
 
 Use VIEW as an internal guide:
 - V: Give a simple and direct initial view in everyday language.
@@ -245,6 +270,11 @@ Conversation rules:
 - Avoid phrases such as “your base case”, “you may be assuming”, “rather than treating”, “you should allow for”, “the prudent approach”, or anything that sounds corrective or advisory.
 - Do not sound like a strategist, economist, research note or official house view.
 - Keep the tone warm, modest, natural and easy to say aloud.
+- Prefer short sentences and familiar business language. Put one main idea in each sentence.
+- Use no more than two market drivers unless the question genuinely requires more.
+- Avoid research-note expressions such as “the cross”, “upside”, “downside”, “supportive backdrop”, “risk sentiment”, “high-beta”, “repricing”, “terms of trade” or “the path remains”. When a technical term is necessary, explain it immediately.
+- Avoid sounding memorised or unusually authoritative for a junior banker. Use modest openings such as “My near-term view is…” or “The broad picture is…”, not grand claims.
+- The response should be useful even when spoken without charts or notes.
 - Do not invent facts, forecasts, figures or institutional views.
 - If the source-based context was partly informed by event-market pricing, do not mention that mechanism, odds, bets or implied probabilities in the spoken response unless the client specifically asks about the source.`
       },
@@ -268,11 +298,15 @@ Source handling:
 - Live web context may update observed facts and developments, but it must not be described as an authorised bank view.
 - Do not mention the report title or source details in the spoken response unless natural and necessary. The interface will disclose the source separately.
 
+${alternativeRequest ? `ALTERNATIVE RESPONSE REQUEST:
+Generate another valid VIEW response using the same underlying market context. Keep the factual direction consistent, but use a meaningfully different natural phrasing, sentence rhythm or emphasis. Do not simply replace a few words. The purpose is to demonstrate that VIEW is a guide rather than a script. Avoid repeating this earlier response closely:
+${previousResponse || "No earlier response supplied."}
+` : ""}
 Create one suggested response for the junior banker.
 
 Output requirements:
-- responseBody: 70–110 words. Give a simple answer, one main uncertainty, and a natural bridge. Do not include the final question.
-- shorterLiveBody: 35–55 words. Keep the same friendly, accessible tone. Do not include the final question.
+- responseBody: 60–95 words, usually four or five short sentences. Give a simple answer, one main uncertainty, and a natural bridge. Do not include the final question.
+- shorterLiveBody: 30–50 words. Keep the same friendly, accessible tone. Do not include the final question.
 - view: a brief plain-English summary of the initial view.
 - influences: the single most important factor that could change the picture, in plain English.
 - effects: one practical way the topic could matter, stated without assuming the client’s exact situation.
@@ -287,6 +321,7 @@ Quality checks:
 - Do not use language that sounds like correcting the client.
 - Do not start with a disclaimer or a question.
 - Do not use jargon where a common word will do.
+- Read it as spoken language: it should sound credible from a junior banker, not like copied research commentary.
 - Do not mention VIEW, the prompt, the model or the source brief.
 - Do not include markdown, citations, publisher names or URLs.`
       }
