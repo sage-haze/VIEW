@@ -99,41 +99,59 @@ function setLoading(loading) {
 }
 
 function renderMarketContext(context, approvedFxSource) {
-  if (!context?.baseline && !approvedFxSource) return;
+  const hasMarketBrief = Boolean(
+    context?.baseline || context?.observed || context?.watch ||
+    (Array.isArray(context?.sources) && context.sources.length) || context?.caution
+  );
 
-  const sources = Array.isArray(context?.sources) ? context.sources : [];
+  if (!hasMarketBrief && !approvedFxSource) return;
+
   const approvedSourceNote = approvedFxSource
     ? renderInternalGuidance(approvedFxSource)
     : "";
 
+  const marketBrief = hasMarketBrief
+    ? renderMarketBrief(context)
+    : "";
+
   marketBox.innerHTML = `
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Current context</p>
-        <h2>Market Brief</h2>
-      </div>
-      ${context?.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
+    <div class="section-heading context-heading">
+      <h2>Current Context</h2>
     </div>
 
-    ${approvedSourceNote}
-
-    ${context?.assumption ? `
-      <div class="assumption">
-        <strong>Assumption</strong>
-        <span>${escapeHtml(context.assumption)}</span>
-      </div>` : ""}
-
-    <div class="context-grid">
-      ${contextPart("Baseline", context?.baseline)}
-      ${contextPart("Observed facts", context?.observed)}
-      ${contextPart("What could change", context?.watch)}
+    <div class="context-sections">
+      ${approvedSourceNote}
+      ${marketBrief}
+      ${context?.assumption ? `
+        <aside class="key-assumptions" aria-label="Key assumptions">
+          <strong>Key assumptions</strong>
+          <p>${escapeHtml(context.assumption)}</p>
+        </aside>` : ""}
     </div>
-
-    ${renderSources(sources)}
-    ${context?.caution ? `<p class="caution">${escapeHtml(context.caution)}</p>` : ""}
   `;
 
   marketBox.classList.remove("hidden");
+}
+
+function renderMarketBrief(context) {
+  const sources = Array.isArray(context?.sources) ? context.sources : [];
+
+  return `
+    <section class="market-brief" aria-label="Market brief">
+      <div class="subsection-heading market-brief-heading">
+        <strong>Market Brief</strong>
+        ${context?.asOf ? `<span class="as-of">As of ${escapeHtml(formatDate(context.asOf))}</span>` : ""}
+      </div>
+      <div class="market-brief-body">
+        <div class="context-grid">
+          ${contextPart("Baseline", context?.baseline)}
+          ${contextPart("Observed facts", context?.observed)}
+          ${contextPart("What could change", context?.watch)}
+        </div>
+        ${renderSources(sources)}
+        ${context?.caution ? `<p class="caution">${escapeHtml(context.caution)}</p>` : ""}
+      </div>
+    </section>`;
 }
 
 function renderInternalGuidance(source) {
@@ -180,14 +198,16 @@ function renderInternalGuidance(source) {
 
   return `
     <section class="internal-guidance" aria-label="Internal guidance">
-      <div class="guidance-heading">
+      <div class="subsection-heading guidance-heading">
         <div>
           <strong>Internal Guidance</strong>
           <span>Guidance from ${escapeHtml(period)}</span>
         </div>
         ${source.sourceKey ? `<a class="guidance-download" href="/api/fx-report/download" target="_blank" rel="noopener">Download PDF</a>` : ""}
       </div>
-      ${guidanceRows || `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
+      <div class="guidance-body">
+        ${guidanceRows || `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
+      </div>
     </section>`;
 }
 
