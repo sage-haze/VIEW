@@ -26,23 +26,48 @@ const FX_REPORT_SCHEMA = {
         additionalProperties: false,
         properties: {
           pair: { type: "string" },
-          recentMovement: { type: "string" },
-          baselineView: { type: "string" },
-          supportingFactors: { type: "array", items: { type: "string" } },
-          changeFactors: { type: "array", items: { type: "string" } },
-          possibleBusinessImplications: { type: "array", items: { type: "string" } },
+          movementGuidance: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              sourceLabel: { type: "string" },
+              symbol: { type: "string" },
+              direction: {
+                type: "string",
+                enum: ["up", "down", "flat", "mixed", "unclear"]
+              },
+              strength: {
+                type: "string",
+                enum: ["strong", "moderate", "mild", "flat", "not-stated"]
+              },
+              plainMeaning: { type: "string" }
+            },
+            required: ["sourceLabel", "symbol", "direction", "strength", "plainMeaning"]
+          },
+          marketMove: { type: "string" },
+          principalDriver: { type: "string" },
+          supportingDevelopments: { type: "array", items: { type: "string" } },
+          domesticOrRegionalFactors: { type: "string" },
+          baseCase: { type: "string" },
+          confirmationConditions: { type: "array", items: { type: "string" } },
+          challengeConditions: { type: "array", items: { type: "string" } },
+          corporateRelevance: { type: "array", items: { type: "string" } },
           keyLevelsSummary: { type: "string" },
-          plainEnglishSummary: { type: "string" }
+          sourceFaithfulCommentary: { type: "string" }
         },
         required: [
           "pair",
-          "recentMovement",
-          "baselineView",
-          "supportingFactors",
-          "changeFactors",
-          "possibleBusinessImplications",
+          "movementGuidance",
+          "marketMove",
+          "principalDriver",
+          "supportingDevelopments",
+          "domesticOrRegionalFactors",
+          "baseCase",
+          "confirmationConditions",
+          "challengeConditions",
+          "corporateRelevance",
           "keyLevelsSummary",
-          "plainEnglishSummary"
+          "sourceFaithfulCommentary"
         ]
       }
     },
@@ -94,7 +119,7 @@ export async function getOrRefreshFxReport({ env, allowRefresh = true, force = f
     try {
       const cached = await cachedObject.json();
       if (
-        cached?.schemaVersion === 2 &&
+        cached?.schemaVersion === 3 &&
         cached?.source?.key === source.key &&
         cached?.source?.etag === source.etag
       ) {
@@ -164,15 +189,20 @@ async function extractAndStore({ env, source, processedKey }) {
                 text: `Extract the attached approved FX report into the required JSON structure.
 
 Rules:
-- Use only information actually present in the document.
-- Preserve the stated date or validity period.
-- Keep each currency pair separate.
-- Distinguish the report's baseline view from factors that support it and factors that could change it.
-- Possible business implications must remain conditional and must not become recommendations.
-- For plainEnglishSummary, write one or two short sentences for a non-specialist. Explain the direction and the main reason using everyday language. Avoid jargon such as high-beta, hawkish, terms of trade, carry, repricing, or risk proxy. Do not include figures unless essential.
-- Summarise levels rather than inventing missing values.
-- Use an empty string or empty array where the document does not provide an item.
-- Do not add current web information or your own market view.`
+- Use only information actually present in the document. Do not add current web information, external facts or your own market view.
+- Preserve the stated date or validity period and keep each currency pair separate.
+- Rewrite each pair in the voice of an experienced treasury adviser explaining the market to a corporate finance reader.
+- Lead with the market conclusion: what moved, in which direction and the main cause.
+- Rank drivers by importance. Clearly separate the principal driver from supporting, domestic and regional factors.
+- Keep one main idea per sentence. Prefer direct causal wording and avoid decorative market language.
+- Retain technical terms only when they add precision, such as yield differentials, core inflation, hedging demand and monetary easing. Replace trading shorthand such as caught a bid, did the heavy lifting, hawkish read, high-beta, fade, relief rally and repricing.
+- Separate observation, interpretation and outlook. State the base case directly, then identify what would confirm it and what would challenge it.
+- Keep corporate implications conditional and informative. Do not turn them into a transaction or hedging recommendation.
+- sourceFaithfulCommentary should be concise but not compressed, normally 90–160 words in two or three short paragraphs. Preserve the source's analytical hierarchy, events, causal links and direction. Remove repetition and low-priority calendar detail rather than combining too many ideas.
+- Extract the report's displayed movement guidance exactly where possible, including words and symbols such as Flat, Mild, arrows or other labels. Store the original wording in movementGuidance.sourceLabel and the visible symbol in movementGuidance.symbol.
+- Normalise the displayed guidance into direction and strength without changing its meaning. Use unclear or not-stated when the display cannot be interpreted reliably.
+- movementGuidance.plainMeaning should explain what the displayed direction means for the quoted currency pair in one short sentence. Do not infer beyond the source.
+- Summarise levels rather than inventing missing values. Use an empty string or empty array where the document does not provide an item.`
               }
             ]
           },
@@ -232,7 +262,7 @@ Rules:
     }
 
     const stored = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       source: {
         key: source.key,
         etag: source.etag,
@@ -249,7 +279,7 @@ Rules:
       customMetadata: {
         sourcePdfKey: source.key,
         sourcePdfEtag: source.etag,
-        schemaVersion: "1"
+        schemaVersion: "3"
       }
     });
 
@@ -327,11 +357,17 @@ function selectRelevantSections(question, report) {
 function formatApprovedContext(report, sections) {
   const header = report.report || {};
   const pairText = sections.map((item) => `PAIR: ${item.pair}
-Recent movement: ${item.recentMovement || "Not stated."}
-Baseline view in the report: ${item.baselineView || "Not stated."}
-Supporting factors: ${(item.supportingFactors || []).join("; ") || "Not stated."}
-What could change it: ${(item.changeFactors || []).join("; ") || "Not stated."}
-Possible business implications: ${(item.possibleBusinessImplications || []).join("; ") || "Not stated."}
+Displayed movement guidance: ${item.movementGuidance?.sourceLabel || "Not stated."}
+Normalised direction: ${item.movementGuidance?.direction || "unclear"}; strength: ${item.movementGuidance?.strength || "not-stated"}
+Plain meaning: ${item.movementGuidance?.plainMeaning || "Not stated."}
+Market move: ${item.marketMove || "Not stated."}
+Principal driver: ${item.principalDriver || "Not stated."}
+Supporting developments: ${(item.supportingDevelopments || []).join("; ") || "Not stated."}
+Domestic or regional factors: ${item.domesticOrRegionalFactors || "Not stated."}
+Base case in the report: ${item.baseCase || "Not stated."}
+What would confirm it: ${(item.confirmationConditions || []).join("; ") || "Not stated."}
+What would challenge it: ${(item.challengeConditions || []).join("; ") || "Not stated."}
+Possible corporate relevance: ${(item.corporateRelevance || []).join("; ") || "Not stated."}
 Key levels: ${item.keyLevelsSummary || "Not stated."}`).join("\n\n");
 
   return `INTERNAL FX GUIDANCE
@@ -342,20 +378,27 @@ Stated period: ${header.periodStart || "Not stated"} to ${header.periodEnd || "N
 ${pairText}
 
 Usage rules:
-- Treat this as internal guidance for the stated report period.
+- Use this internal guidance as the primary source for the FX direction and analytical explanation.
+- Keep the direction and causal story consistent with the report.
 - Attribute any institutional view to the report, not to yourself.
 - Do not present your own inference as an official bank view.
-- Do not invent figures or extend the report beyond what it says.
-- Use the report dates to make the timing of the guidance clear.`;
+- Do not invent figures or extend the report beyond what it says.`;
 }
 
 function sourceSummary(report, source, pairs = [], sections = []) {
   const guidanceItems = sections
     .map((section) => ({
       pair: clean(section?.pair || "", 20),
+      movementGuidance: {
+        sourceLabel: clean(section?.movementGuidance?.sourceLabel || "", 60),
+        symbol: clean(section?.movementGuidance?.symbol || "", 12),
+        direction: clean(section?.movementGuidance?.direction || "unclear", 20),
+        strength: clean(section?.movementGuidance?.strength || "not-stated", 20),
+        plainMeaning: clean(section?.movementGuidance?.plainMeaning || "", 240)
+      },
       summary: clean(
-        section?.plainEnglishSummary || section?.baselineView || section?.recentMovement || "",
-        300
+        section?.sourceFaithfulCommentary || section?.baseCase || section?.marketMove || "",
+        1400
       )
     }))
     .filter((item) => item.pair && item.summary);

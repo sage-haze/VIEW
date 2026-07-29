@@ -132,11 +132,31 @@ function renderInternalGuidance(source) {
 
   const guidanceRows = items
     .filter((item) => item?.summary)
-    .map((item) => `
-      <div class="guidance-item">
-        <strong>${escapeHtml(item.pair || "Guidance")}</strong>
-        <p>${escapeHtml(item.summary)}</p>
-      </div>`).join("");
+    .map((item) => {
+      const movement = item.movementGuidance || {};
+      const sourceLabel = movement.sourceLabel || [movement.symbol, movement.strength].filter(Boolean).join(" ");
+      const directionClass = ["up", "down", "flat", "mixed"].includes(movement.direction)
+        ? movement.direction
+        : "unclear";
+      const paragraphs = String(item.summary)
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+        .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+        .join("");
+
+      return `
+        <div class="guidance-item">
+          <div class="guidance-pair">
+            <strong>${escapeHtml(item.pair || "Guidance")}</strong>
+            ${sourceLabel ? `<span class="movement-badge movement-${directionClass}">${escapeHtml(sourceLabel)}</span>` : ""}
+          </div>
+          <div class="guidance-copy">
+            ${movement.plainMeaning ? `<p class="movement-meaning">${escapeHtml(movement.plainMeaning)}</p>` : ""}
+            ${paragraphs}
+          </div>
+        </div>`;
+    }).join("");
 
   return `
     <section class="internal-guidance" aria-label="Internal guidance">

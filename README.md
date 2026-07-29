@@ -143,3 +143,9 @@ When internal FX guidance is used, the Market Brief shows a **Download PDF** lin
 ```
 
 The endpoint expects exactly one PDF under `source/`. Anyone who can access the deployed endpoint can download the report, so protect the site with the same access controls appropriate for the internal document.
+
+## Source-faithful FX commentary schema
+
+FX report extraction now uses schema version 3. Each currency pair is rewritten once, during PDF processing, using the corporate-market-commentary writing guide. The processed JSON also records the report's displayed movement guidance, including the source label/symbol and a normalized direction and strength.
+
+After deploying this version, use the FX Report Manager to **Force rebuild** the current report. Existing schema-version-2 JSON will also be treated as stale and rebuilt automatically. The learner page reads `sourceFaithfulCommentary` directly rather than asking the answer model to paraphrase the report for the Internal Guidance panel.

@@ -462,3 +462,58 @@ code { background: #eef2f8; border-radius: 5px; padding: .1em .35em; }
   .alternative-actions { align-items: stretch; flex-direction: column; }
   .secondary-button { width: 100%; white-space: normal; }
 }
+
+.guidance-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.movement-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(36, 63, 157, .18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .68);
+  color: #44506a;
+  font-size: .72rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.movement-up { border-color: rgba(47, 122, 86, .28); color: #246948; }
+.movement-down { border-color: rgba(166, 79, 79, .28); color: #8b4141; }
+.movement-flat { border-color: rgba(92, 104, 127, .24); color: #596478; }
+.movement-mixed,
+.movement-unclear { border-color: rgba(157, 120, 46, .26); color: #765f2f; }
+
+.guidance-copy p {
+  margin: 0;
+  line-height: 1.58;
+}
+
+.guidance-copy p + p {
+  margin-top: 8px;
+}
+
+.guidance-copy .movement-meaning {
+  color: #5f5746;
+  font-size: .88rem;
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .guidance-item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .guidance-pair {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
