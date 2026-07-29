@@ -21,20 +21,22 @@
       <textarea id="question" maxlength="1500" required
         placeholder="Do you think interest rates will fall soon?"></textarea>
 
-      <div class="form-row">
-        <div>
-          <label for="marketRegion">Market or region <span>(optional)</span></label>
-          <input id="marketRegion" maxlength="120"
-            placeholder="e.g. United States, Singapore, United Kingdom">
-          <small>Useful for rates, currencies, regulation, and market outlooks.</small>
-        </div>
+      <details class="advanced-settings">
+        <summary>Advanced settings <span>Optional market and client context</span></summary>
+        <div class="advanced-content form-row">
+          <div>
+            <label for="marketRegion">Market or region</label>
+            <input id="marketRegion" maxlength="120"
+              placeholder="United States, Singapore, United Kingdom">
+          </div>
 
-        <div>
-          <label for="clientContext">Client context <span>(optional)</span></label>
-          <textarea id="clientContext" class="compact" maxlength="1000"
-            placeholder="e.g. The client is refinancing a facility in six months."></textarea>
+          <div>
+            <label for="clientContext">Client context</label>
+            <textarea id="clientContext" class="compact" maxlength="1000"
+              placeholder="The client is refinancing a facility in six months."></textarea>
+          </div>
         </div>
-      </div>
+      </details>
 
       <fieldset class="source-options">
         <legend>Reference</legend>

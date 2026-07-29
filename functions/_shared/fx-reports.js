@@ -119,7 +119,7 @@ export async function getOrRefreshFxReport({ env, allowRefresh = true, force = f
     try {
       const cached = await cachedObject.json();
       if (
-        cached?.schemaVersion === 3 &&
+        cached?.schemaVersion === 4 &&
         cached?.source?.key === source.key &&
         cached?.source?.etag === source.etag
       ) {
@@ -191,14 +191,17 @@ async function extractAndStore({ env, source, processedKey }) {
 Rules:
 - Use only information actually present in the document. Do not add current web information, external facts or your own market view.
 - Preserve the stated date or validity period and keep each currency pair separate.
-- Rewrite each pair in the voice of an experienced treasury adviser explaining the market to a corporate finance reader.
-- Lead with the market conclusion: what moved, in which direction and the main cause.
-- Rank drivers by importance. Clearly separate the principal driver from supporting, domestic and regional factors.
-- Keep one main idea per sentence. Prefer direct causal wording and avoid decorative market language.
-- Retain technical terms only when they add precision, such as yield differentials, core inflation, hedging demand and monetary easing. Replace trading shorthand such as caught a bid, did the heavy lifting, hawkish read, high-beta, fade, relief rally and repricing.
-- Separate observation, interpretation and outlook. State the base case directly, then identify what would confirm it and what would challenge it.
-- Keep corporate implications conditional and informative. Do not turn them into a transaction or hedging recommendation.
-- sourceFaithfulCommentary should be concise but not compressed, normally 90–160 words in two or three short paragraphs. Preserve the source's analytical hierarchy, events, causal links and direction. Remove repetition and low-priority calendar detail rather than combining too many ideas.
+- Rewrite each currency section for a corporate finance reader who may not follow markets closely.
+- Keep the meaning, direction, events and analytical priorities faithful to the report.
+- Lead with what moved, in which direction and the main reason.
+- Use short sentences and one main idea per sentence.
+- Explain cause and effect directly.
+- Separate what happened, what it means and the report's outlook.
+- Replace trading shorthand, metaphors and compressed research language with familiar business words.
+- Keep a technical term only when it adds necessary precision, and explain it briefly in ordinary language.
+- State the base case directly, then explain what would support or challenge it.
+- Include one possible implication for corporate cash flows or planning without giving a recommendation.
+- sourceFaithfulCommentary should normally be 80–140 words in two or three short paragraphs. Remove repetition and low-priority detail rather than packing several ideas into one sentence.
 - Extract the report's displayed movement guidance exactly where possible, including words and symbols such as Flat, Mild, arrows or other labels. Store the original wording in movementGuidance.sourceLabel and the visible symbol in movementGuidance.symbol.
 - Normalise the displayed guidance into direction and strength without changing its meaning. Use unclear or not-stated when the display cannot be interpreted reliably.
 - movementGuidance.plainMeaning should explain what the displayed direction means for the quoted currency pair in one short sentence. Do not infer beyond the source.
@@ -262,7 +265,7 @@ Rules:
     }
 
     const stored = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       source: {
         key: source.key,
         etag: source.etag,
@@ -279,7 +282,7 @@ Rules:
       customMetadata: {
         sourcePdfKey: source.key,
         sourcePdfEtag: source.etag,
-        schemaVersion: "3"
+        schemaVersion: "4"
       }
     });
 
