@@ -160,3 +160,10 @@ The learner page offers three source modes:
 - **Market sources only**: uses current web search and does not read or display the internal FX guidance.
 
 The selected mode is preserved when the user generates another VIEW response.
+
+## Plain-language and compact interface update
+
+- Market briefs, internal FX extraction and VIEW responses now use plain professional language for corporate finance readers who may not follow markets daily.
+- Technical terms are retained only when needed for accuracy and should be explained in ordinary language.
+- Optional market/region and client context fields are grouped under **Advanced settings**.
+- The FX extraction schema is version 4. Use **Force rebuild** in the FX Report Manager after deployment so the current PDF is reprocessed with the updated writing guidance.

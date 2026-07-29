@@ -199,41 +199,42 @@ async function createMarketContext({
     input: [
       {
         role: "system",
-        content: `Prepare a compact, source-based market context for a banker answering a client question.
+        content: `Prepare a short market brief for a corporate finance reader who may not follow financial markets closely.
 
-Use current, authoritative sources. Start with sources from the country, market or region named in the question. Strongly prioritise the relevant local central bank, regulator, government statistical agency, official benchmark administrator and reputable local or regional reporting. Use global institutions and overseas central banks only for genuinely relevant external drivers, not as substitutes for local evidence. If the supplied market or region says Thailand was used as an application default, treat Thailand as a working assumption and state that assumption clearly rather than presenting it as something the client specified.
+Use current, authoritative sources. Prioritise official and reputable sources from the market or country named in the question. Use global sources only when they explain an important external influence.
 
-Aim for source diversity: use at least two independent high-quality publishers or institutions whenever the topic permits, and avoid relying on several pages from the same domain. When a jurisdiction is explicit, most supporting sources should directly cover that jurisdiction. For example, for Singapore mortgages or Singapore-dollar rates, prioritise MAS, Singapore government or benchmark sources, the Association of Banks in Singapore, and reputable Singapore or Asia-focused reporting; Federal Reserve material may support the global-rate backdrop but should not dominate the evidence. For Thailand rates, prioritise the Bank of Thailand, Thai government or official statistical sources, Thai bond or benchmark administrators, and reputable Thailand or regional reporting.
+Writing principles:
+- Lead with the clearest answer to the question.
+- Use familiar business language and short sentences.
+- Keep one main idea per sentence.
+- Explain cause and effect directly.
+- Separate what has happened from what it may mean.
+- Keep only the most important facts and drivers.
+- Replace market shorthand and unnecessary jargon with plain language.
+- Retain a technical term only when it adds precision, and explain it briefly in ordinary words.
+- Avoid metaphors, trader expressions and compressed research-note wording.
+- Do not give personalised advice or tell the reader what action to take.
+- State an assumption only when the market, currency or jurisdiction is unclear.
 
-Separate observed facts from the baseline outlook. State an explicit assumption only when the market, currency or jurisdiction is unclear. Keep the language plain and avoid personalised advice.
-
-Where the question concerns a clearly defined future event, you may consult reputable event or prediction markets only as a quiet secondary background signal. Use that signal solely to corroborate or challenge conclusions already supported by stronger evidence from official data, conventional financial-market pricing, professional surveys and reputable reporting. Never let it determine the baseline, supply an observed fact, or replace a reputable supporting source. Treat any implied probability as a rough participant expectation, not a fact, forecast, recommendation or definitive consensus. Ignore thin, stale, ambiguous or poorly matched contracts.
-
-Do not mention bookmakers, betting, wagers, odds, strong bets, event markets or prediction markets in the four prose fields. Do not rely on them for any claim unless the same direction is independently supported by reputable sources. Translate any useful background signal into restrained language only when it materially improves the synthesis.
-
-Return clean prose only in the structured fields. Do not include citations, publisher names, domains, URLs, markdown links, footnotes or source markers in assumption, baseline, observed or watch. Sources are collected separately by the application.`
+Return prose only in the requested fields. Do not include citations, publisher names, URLs, footnotes or source markers. Sources are collected separately by the application.`
       },
       {
         role: "user",
-        content: `${formatClientInput({
-          question,
-          marketRegion,
-          clientContext
-        })}
+        content: `${formatClientInput({ question, marketRegion, clientContext })}
 
 As of: ${asOf}
 
 Return four short fields:
-- assumption: one sentence or an empty string
-- baseline: the likely direction and horizon, no more than 45 words
-- observed: the two most relevant current facts, no more than 50 words
-- watch: one or two developments that could change the view, no more than 40 words
+- assumption: one clear sentence or an empty string
+- baseline: the likely direction and timeframe, no more than 40 words
+- observed: the two most relevant current facts, no more than 45 words
+- watch: one or two developments that could change the view, no more than 35 words
 
-Check the direction of causal claims and describe opposing forces separately. Ground the observed field primarily in local official releases and reputable local or regional reporting, supplemented by global sources only where they directly explain an external driver. Search for evidence that matches the named jurisdiction and topic rather than defaulting to United States sources. If a clearly defined event has relevant event-market pricing, use it only as quiet corroboration in the background after the conclusion is already supported by stronger sources. Do not foreground it, quote odds or probabilities, describe the outcome as a strong bet or market consensus, or depend on it for any observation.`
+Check that each causal statement is accurate. Describe opposing forces separately rather than combining them into one dense sentence.`
       }
     ],
     text: jsonFormat("market_context", MARKET_CONTEXT_SCHEMA),
-    max_output_tokens: 1800,
+    max_output_tokens: 1500,
     store: false
   });
 
@@ -246,8 +247,7 @@ Check the direction of causal claims and describe opposing forces separately. Gr
     watch: sanitiseMarketProse(parsed.watch),
     asOf,
     sources: extractSources(response, { question, marketRegion }),
-    caution:
-      "This is a time-sensitive synthesis, not a guaranteed forecast or personalised advice."
+    caution: "This is a market view, not a guaranteed forecast or personalised advice."
   };
 }
 
@@ -275,35 +275,29 @@ async function createViewAnswer({
     input: [
       {
         role: "system",
-        content: `You are helping a friendly junior banker with about one to two years of experience respond to a client.
-
-The banker is building rapport, not trying to sound like a market expert. The response should feel polished but attainable: something a capable junior could understand, adapt and say comfortably after brief preparation. Take the client’s question at face value and treat it as a genuine invitation to share a useful thought. Assume there may be a personal, business or financial reason behind the question, but do not guess what that reason is, overstate its importance or assume the client already holds a particular market view.
+        content: `Help a banker give a clear and useful response to a client who may work in corporate finance but may not follow markets closely.
 
 Use VIEW as an internal guide:
-- V — Give a baseline view: Offer a simple and direct starting point in everyday language.
-- I — Identify what may change the view: Mention one or two important uncertainties or conditions to watch.
-- E — Explain possible implications: Translate the issue into possible practical relevance, using conditional language where the relevance is not yet clear.
-- W — Welcome what matters to the client: Bridge from the general implications to the client’s situation, then end with one friendly, topic-specific question that offers useful possibilities while leaving room for something else.
+- V — Give a baseline view: answer the question directly in plain language.
+- I — Identify what may change the view: name one or two important conditions.
+- E — Explain possible implications: show how the issue could affect an ordinary business decision or cash flow.
+- W — Welcome what matters to the client: end with one specific but open question about what is relevant to them.
 
-Conversation rules:
-- Answer before asking a question.
-- Use plain English that does not require financial-market knowledge.
-- Explain any necessary market term in ordinary words.
-- Do not correct, challenge or reframe the client’s premise.
-- Do not imply that the client is wrong, overconfident, relying on a false floor, chasing a market move, or overlooking risk.
+Writing principles:
+- Sound polished, professional and easy to say aloud.
+- Use language a non-specialist can understand on first reading.
+- Prefer common words, short sentences and one main idea per sentence.
+- Explain cause and effect directly.
+- Replace shorthand and technical jargon with plain language.
+- Keep a technical term only when it is necessary for accuracy, and explain it immediately.
+- Do not sound like a trading desk, research report, economist or formal house view.
+- Do not use metaphors, market slogans or compressed phrases.
+- Do not correct the client, guess their motive or assume their exposure.
 - Do not tell the client what they should do.
-- Do not jump to a product, transaction or technical solution.
-- A gentle relevance link is welcome, but phrase it as an invitation rather than a conclusion. Do not claim to know the client’s exposure, objective or decision.
-- Avoid phrases such as “your base case”, “you may be assuming”, “rather than treating”, “you should allow for”, “the prudent approach”, or anything that sounds corrective or advisory.
-- Do not sound like a strategist, economist, research note or official house view.
-- Keep the tone warm, modest, natural and easy to say aloud.
-- Prefer short sentences and familiar business language. Put one main idea in each sentence.
-- Use no more than two market drivers unless the question genuinely requires more.
-- Avoid research-note expressions such as “the cross”, “upside”, “downside”, “supportive backdrop”, “risk sentiment”, “high-beta”, “repricing”, “terms of trade” or “the path remains”. When a technical term is necessary, explain it immediately.
-- Avoid sounding memorised or unusually authoritative for a junior banker. Use modest openings such as “My near-term view is…” or “The broad picture is…”, not grand claims.
-- The response should be useful even when spoken without charts or notes.
-- Do not invent facts, forecasts, figures or institutional views.
-- If the source-based context was partly informed by event-market pricing, do not mention that mechanism, odds, bets or implied probabilities in the spoken response unless the client specifically asks about the source.`
+- Do not jump to a product or recommendation.
+- Answer before asking a question.
+- Use no more than two important drivers unless more are essential.
+- Do not invent facts, figures, forecasts or institutional views.`
       },
       {
         role: "user",
@@ -329,28 +323,19 @@ ${alternativeRequest ? `ALTERNATIVE RESPONSE REQUEST:
 Generate another valid VIEW response using the same underlying market context. Keep the factual direction consistent, but use a meaningfully different natural phrasing, sentence rhythm or emphasis. Do not simply replace a few words. The purpose is to demonstrate that VIEW is a guide rather than a script. Avoid repeating this earlier response closely:
 ${previousResponse || "No earlier response supplied."}
 ` : ""}
-Create one suggested response for the junior banker.
+Create one suggested response.
 
 Output requirements:
-- responseBody: 60–95 words, usually four or five short sentences. Give a simple answer, one main uncertainty, and a natural bridge. Do not include the final question.
-- shorterLiveBody: 30–50 words. Keep the same friendly, accessible tone. Do not include the final question.
-- view: a brief plain-English summary of the initial view.
-- influences: the single most important factor that could change the picture, in plain English.
-- effects: one practical way the topic could matter, stated without assuming the client’s exact situation.
-- clientQuestion: one friendly, topic-specific question ending in a question mark. The question should gently test the relevance of the topic to the client and should be tailored to the subject. It may ask whether the topic connects to something the client is considering, planning or watching, while leaving room for simple curiosity. Do not use the same generic wording repeatedly. Do not ask “What have you been hearing?”, “What made you ask?”, or “Is there another angle you have in mind?”. Do not jump to a product or transaction.
+- responseBody: 55–90 words in four or five short sentences. Give a direct view, the main uncertainty and one possible business implication. Do not include the final question.
+- shorterLiveBody: 25–45 words with the same meaning and tone. Do not include the final question.
+- view: a brief summary of the initial view in everyday language.
+- influences: the most important factor that could change the picture.
+- effects: one practical way the issue could matter to a business, without assuming the client’s situation.
+- clientQuestion: one natural, topic-specific and open question ending in a question mark.
 - assumptionsMade: state any material interpretation used, or “None”.
 - verificationNeeded: identify current facts that should be checked, or “None”.
 
-Quality checks:
-- Take the client’s wording at face value.
-- Make a gentle relevance link without pretending to know the reason behind the question.
-- Do not infer or comment on the client’s own view.
-- Do not use language that sounds like correcting the client.
-- Do not start with a disclaimer or a question.
-- Do not use jargon where a common word will do.
-- Read it as spoken language: it should sound credible from a junior banker, not like copied research commentary.
-- Do not mention VIEW, the prompt, the model or the source brief.
-- Do not include markdown, citations, publisher names or URLs.`
+Before returning the answer, check that a finance professional who does not follow markets daily can understand it without further explanation. Do not mention VIEW, the prompt, the model or the source brief. Do not include markdown, citations, publisher names or URLs.`
       }
     ],
     text: {
