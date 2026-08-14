@@ -1,6 +1,6 @@
 # VIEW Stage 1 with approved FX reports
 
-This version adds an R2-backed approved source workflow.
+This version keeps approved internal guidance and current market sources as separate inputs, while making both easier for a junior banker to use.
 
 ## Required Cloudflare bindings and secrets
 
@@ -13,6 +13,8 @@ Optional model variables:
 - `OPENAI_ANSWER_MODEL` — defaults to `gpt-5.6-terra`
 - `OPENAI_ANALYSIS_MODEL` — defaults to `gpt-5.4-mini`
 - `OPENAI_EXTRACTION_MODEL` — defaults to `OPENAI_ANALYSIS_MODEL`, then `gpt-5.4-mini`
+- `OPENAI_SIMPLIFICATION_MODEL` — defaults to `OPENAI_ANALYSIS_MODEL`, then `gpt-5.4-mini`
+- `OPENAI_GUIDANCE_MODEL` — defaults to `OPENAI_ANALYSIS_MODEL`, then `gpt-5.4-mini`
 
 Create the same bindings in each Cloudflare Pages environment that you use, then redeploy.
 
@@ -20,36 +22,104 @@ Create the same bindings in each Cloudflare Pages environment that you use, then
 
 Upload exactly one current PDF to:
 
-```
+```text
 source/<your-report-name>.pdf
 ```
 
 The application writes the processed cache to:
 
-```
+```text
 processed/<your-report-name>.json
 ```
 
-Do not upload a JSON file manually. The refresh function creates it.
+Do not upload a JSON file manually. The processing workflow creates it.
 
-## Refresh after uploading a PDF
+## Internal guidance processing
 
-The protected endpoint is:
+Processed internal reports use **schema version 5**.
 
+When a PDF is processed, the application now uses two distinct steps:
+
+1. **Source-faithful extraction** — key sections are extracted into structured JSON without rewriting for an audience. Direction, timeframe, confidence, conditions, causal priority, dates and levels are preserved.
+2. **Controlled simplification** — the extracted JSON is rewritten in clearer professional language without adding or changing meaning. Empty source fields remain empty and no new corporate implications are created.
+
+The stored JSON keeps both representations:
+
+```text
+report                 report metadata
+sourceExtract           source-faithful extracted sections
+simplified              meaning-preserving simplified copy
+source                   processing metadata and model names
 ```
+
+Keeping both versions provides an audit trail and lets the richer source extract remain available to the VIEW answer model.
+
+### Question-time Internal Guidance
+
+When a learner asks a relevant FX question, the application:
+
+1. selects only the relevant stored currency-pair sections;
+2. writes a compact explanation for a junior corporate banker with about one to two years of experience;
+3. shows that explanation in the **Internal Guidance** panel; and
+4. separately passes the richer source extract plus the stored simplified copy to the VIEW answer model.
+
+The question-time explanation is not allowed to add current market facts, outside knowledge, recommendations or new implications. If that rewriting step fails, the page falls back to the stored simplified JSON rather than dropping the internal guidance entirely.
+
+## Market-source context
+
+The **Market Brief** remains separate from Internal Guidance.
+
+Current market research is written as compact source-based context for a junior corporate banker. The research prompt prioritises official institutions, central banks, regulators, recognised international organisations and reputable direct reporting. It aims to use at least two independent high-quality sources when the topic permits.
+
+Observed facts are kept separate from the baseline outlook. Event or prediction-market signals may be used only as quiet secondary corroboration for clearly defined future events; they cannot determine the baseline or supply an observed fact, and they are not displayed as sources in the interface.
+
+## VIEW response style
+
+The answer prompt is centred again on a **friendly junior banker with about one to two years of experience**.
+
+The generated response should:
+
+- answer the client's question before asking anything;
+- treat the question as a genuine invitation to share a useful thought;
+- give a simple initial view;
+- usually mention one main factor that could change the picture;
+- explain one possible practical relevance without assuming the client's exposure or motive;
+- end with one friendly, topic-specific and open question;
+- sound warm, modest, professional, natural and easy to say aloud;
+- avoid corrective or advisory language, premature products and research-note phrasing.
+
+The existing source-governance safeguards remain: approved internal guidance drives the institutional FX direction when relevant, while live web context may update observed facts without being represented as an authorised bank view.
+
+## Reference choices
+
+The learner page offers three source modes:
+
+- **Internal guidance and market sources** — uses relevant content from the processed R2 report and current web search. The two remain separate in the Current Context display.
+- **Internal guidance only** — uses no web search. If the report does not contain a relevant currency section, the page asks the user to select another source.
+- **Market sources only** — uses current web search and does not read or display the internal FX guidance.
+
+The selected mode is preserved when the user generates another VIEW response.
+
+## Refresh after deploying this version
+
+Because the internal report schema has changed from version 4 to version 5, rebuild the processed JSON after deployment.
+
+The easiest route is the web manager:
+
+```text
+/admin/fx-report.html
+```
+
+Choose **Force rebuild JSON** for the current report, or upload a replacement PDF and process it.
+
+The protected endpoint remains:
+
+```text
 POST /api/admin/refresh-fx-report
 Authorization: Bearer <FX_REFRESH_TOKEN>
 ```
 
-Example from a terminal:
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer YOUR_FX_REFRESH_TOKEN" \
-  https://YOUR-SITE.pages.dev/api/admin/refresh-fx-report
-```
-
-To force a rebuild even when the PDF etag matches:
+To force a rebuild:
 
 ```bash
 curl -X POST \
@@ -67,15 +137,15 @@ curl \
 
 ## Automatic fallback
 
-`/api/view` also checks the R2 cache. When a relevant FX question is asked and the JSON is missing or stale, it attempts one extraction and writes the JSON. The manual refresh endpoint is still preferable because it prevents the first learner after an upload from waiting for extraction.
+`/api/view` checks the R2 cache. When a relevant internal-guidance question is asked and the JSON is missing or stale, it attempts to rebuild the JSON. A manual refresh after uploading a report is still preferable because it avoids making the first learner wait for the two processing steps.
 
-If extraction fails, the normal VIEW response can still run without the approved report. The failure is logged in Cloudflare rather than exposing internal details in the learner interface.
+If internal processing fails in combined mode, the normal market-source VIEW response can still run and the error is shown in the page status. In internal-only mode, the page asks the learner to select another source rather than silently switching to web research.
 
 ## Health check
 
 Open:
 
-```
+```text
 /api/health
 ```
 
@@ -85,30 +155,23 @@ Confirm that these are true:
 - `fxReportsConfigured`
 - `fxRefreshTokenConfigured`
 
+The health response also shows the configured answer, analysis, extraction, simplification and guidance models.
+
 ## How matching works
 
-The cache is considered current only when both the source key and source PDF etag match the values saved in the JSON. Replacing a PDF with a revised file under the same filename therefore triggers a rebuild.
+The cache is current only when both the source key and PDF etag match the values saved in the JSON. Replacing a PDF with a revised file under the same filename therefore triggers a rebuild.
 
 The report is supplied to the answer model only when the question mentions a supported pair or currency, including USDTHB, EURUSD, GBPUSD, AUDUSD, USDJPY and USDCNY. Broad foreign-exchange questions can use all available pair sections.
-
-## R2 troubleshooting
-
-`/api/health` now lists the exact object keys visible under `source/` and `processed/`.
-The PDF key must begin with `source/`, for example `source/FX Compass.pdf`.
-The dashboard's folders are prefixes; creating an empty folder alone does not put the PDF inside it.
-
-The learner endpoint now reports an extraction error in the page status instead of silently falling back to web context.
-For a deliberate refresh, configure `FX_REFRESH_TOKEN` and call the admin POST endpoint.
 
 ## Web-only FX Report Manager
 
 Open:
 
-```
+```text
 /admin/fx-report.html
 ```
 
-This page is intended for the site owner. It lets you:
+This page lets the site owner:
 
 - save the `FX_REFRESH_TOKEN` in the current browser;
 - check whether the source PDF and processed JSON are current;
@@ -120,50 +183,18 @@ When a new PDF is uploaded through the manager, the application:
 1. writes it to `source/<filename>.pdf`;
 2. deletes other files under `source/`;
 3. deletes prior files under `processed/`;
-4. extracts the new PDF;
-5. writes `processed/<filename>.json`.
+4. extracts the source-faithful JSON;
+5. simplifies that extracted JSON without changing meaning; and
+6. stores both representations in `processed/<filename>.json`.
 
 The upload accepts PDFs up to 20 MB. Do not place the refresh token in source code. Configure it as the Cloudflare Pages secret `FX_REFRESH_TOKEN`; the manager stores the entered value only in that browser's local storage.
 
-
-## Internal Guidance display
-
-Processed reports now use schema version 2. The first request after deployment will rebuild an older cached JSON so each relevant currency pair includes a short plain-English summary for the learner-facing Internal Guidance panel.
-
-## Alternative VIEW responses
-
-The answer panel includes **Generate another VIEW response**. It reuses the same market brief and approved FX context, so it does not repeat the web-search step. The answer model is asked to keep the same underlying direction while using meaningfully different, junior-attainable wording. This demonstrates that VIEW is a guide rather than a fixed script.
-
 ## Downloading the internal guidance PDF
 
-When internal FX guidance is used, the Market Brief shows a **Download PDF** link. The link streams the single PDF currently stored under `source/` through:
+When internal FX guidance is used, the Current Context panel shows a **Download PDF** link. The link streams the single PDF currently stored under `source/` through:
 
 ```text
 /api/fx-report/download
 ```
 
-The endpoint expects exactly one PDF under `source/`. Anyone who can access the deployed endpoint can download the report, so protect the site with the same access controls appropriate for the internal document.
-
-## Source-faithful FX commentary schema
-
-FX report extraction now uses schema version 3. Each currency pair is rewritten once, during PDF processing, using the corporate-market-commentary writing guide. The processed JSON also records the report's displayed movement guidance, including the source label/symbol and a normalized direction and strength.
-
-After deploying this version, use the FX Report Manager to **Force rebuild** the current report. Existing schema-version-2 JSON will also be treated as stale and rebuilt automatically. The learner page reads `sourceFaithfulCommentary` directly rather than asking the answer model to paraphrase the report for the Internal Guidance panel.
-
-
-## Reference choices
-
-The learner page offers three source modes:
-
-- **Internal guidance and market sources**: uses relevant content from the processed R2 report and current web search.
-- **Internal guidance only**: uses no web search. If the report does not contain a relevant currency section, the page asks the user to select another source.
-- **Market sources only**: uses current web search and does not read or display the internal FX guidance.
-
-The selected mode is preserved when the user generates another VIEW response.
-
-## Plain-language and compact interface update
-
-- Market briefs, internal FX extraction and VIEW responses now use plain professional language for corporate finance readers who may not follow markets daily.
-- Technical terms are retained only when needed for accuracy and should be explained in ordinary language.
-- Optional market/region and client context fields are grouped under **Advanced settings**.
-- The FX extraction schema is version 4. Use **Force rebuild** in the FX Report Manager after deployment so the current PDF is reprocessed with the updated writing guidance.
+Anyone who can access the deployed endpoint can download the report, so protect the site with the access controls appropriate for the internal document.

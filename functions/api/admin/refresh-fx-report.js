@@ -48,6 +48,7 @@ function reportSummary(report) {
     periodEnd: report.report?.periodEnd || null,
     publicationDate: report.report?.publicationDate || null,
     processedAt: report.source?.processedAt || null,
-    extractionModel: report.source?.extractionModel || null
+    extractionModel: report.source?.extractionModel || null,
+    simplificationModel: report.source?.simplificationModel || null
   };
 }
