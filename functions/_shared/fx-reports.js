@@ -124,6 +124,8 @@ const JUNIOR_GUIDANCE_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    takeaway: { type: "string" },
+    limitation: { type: "string" },
     items: {
       type: "array",
       items: {
@@ -137,7 +139,7 @@ const JUNIOR_GUIDANCE_SCHEMA = {
       }
     }
   },
-  required: ["items"]
+  required: ["takeaway", "limitation", "items"]
 };
 
 export async function getApprovedFxContext({ env, question, allowRefresh = true, writeForLearner = true }) {
@@ -392,6 +394,7 @@ async function writeJuniorBankerGuidance({ env, question, report, sections }) {
   const payload = sections.map(({ source, simplified }) => ({
     pair: source.pair,
     movementGuidance: source.movementGuidance,
+    sourceExtract: source,
     simplified: simplified || null
   }));
 
@@ -409,18 +412,27 @@ async function writeJuniorBankerGuidance({ env, question, report, sections }) {
         role: "system",
         content: `Write a compact Internal Guidance explanation for a junior corporate banker with about one to two years of experience.
 
-The supplied JSON has already been extracted from an approved report and simplified without changing its meaning. Your job now is only to select and explain the stored points that are most useful for understanding the user's question.
+The supplied JSON has already been extracted from an approved report and simplified without changing its meaning. Your job is to help the banker understand what the selected internal material means for the user's question, while keeping the underlying report views and any synthesis clearly distinct.
 
-Rules:
-- Use only the supplied stored JSON. Do not add current market facts, outside knowledge or your own view.
-- Preserve the report's direction, timeframe, uncertainty, conditions and causal priorities.
+Rules for the top takeaway:
+- Use only the supplied stored JSON. Do not add current market facts, outside knowledge or a new market view.
+- The first sentence must answer the user's question as directly as the selected internal guidance permits.
+- If more than one supplied currency pair is needed, you may state a simple directional implication that follows directly from those supplied views. Make clear that this is what the selected internal guidance "points to" or "would imply"; do not present the cross-rate inference as wording from the report itself.
+- Give only the main reason needed to understand the conclusion. Do not repeat all the supporting drivers.
+- If the user's requested horizon is materially longer or otherwise different from the report's stated period, limitation must say so plainly. For example, a short-dated report must not be presented as a six-month forecast.
+- If the stored material cannot answer the question directly, say that directly rather than stretching the source.
+- Keep takeaway to one or two short sentences, normally no more than 55 words. If limitation is non-empty, do not repeat that caveat in takeaway.
+- Keep limitation to one short sentence or return an empty string when there is no material source limitation to flag.
+
+Rules for the supporting pair items:
+- Preserve the report's direction, timeframe, uncertainty, conditions and causal priorities. Use sourceExtract to resolve any ambiguity; simplified is only a language aid.
 - Do not imply that the dated report is more current than its stated period.
-- Use plain professional language, but do not dumb the content down. The reader works in finance but may not follow markets every day.
-- Explain a necessary market term briefly in ordinary words.
-- Lead with the report's broad view and main reason, then mention the most important condition or development that could support or challenge it.
+- Use plain professional language. Replace market shorthand with ordinary wording and briefly explain any necessary technical term.
+- The interface already shows each pair's movement guidance separately. Do not repeat that movement sentence in the summary. Instead explain the main reason and the single most important condition or development that could support or challenge it.
+- Keep cross-pair or question-specific synthesis in takeaway, not inside an individual pair summary.
 - Mention a business implication only if it exists in the stored source. Phrase it as possible relevance, not as a fact about the client.
 - Do not give advice, recommend a product, write a client script or add a final question.
-- Keep each pair's summary concise, normally about 70–120 words in one or two short paragraphs.
+- Keep each pair's summary concise, normally about 40–75 words in one short paragraph.
 - Return one item for each supplied currency pair and keep the pair code unchanged.`
       },
       {
@@ -430,7 +442,7 @@ Rules:
     ]
   });
 
-  return result?.items || [];
+  return result && typeof result === "object" ? result : null;
 }
 
 async function structuredOpenAI({
@@ -649,9 +661,11 @@ Usage rules:
 }
 
 function sourceSummary(report, source, pairs = [], sections = [], learnerGuidance = null) {
+  const learnerItems = Array.isArray(learnerGuidance)
+    ? learnerGuidance
+    : (Array.isArray(learnerGuidance?.items) ? learnerGuidance.items : []);
   const guidanceByPair = new Map(
-    (Array.isArray(learnerGuidance) ? learnerGuidance : [])
-      .map((item) => [pairCode(item?.pair), clean(item?.summary, 1800)])
+    learnerItems.map((item) => [pairCode(item?.pair), clean(item?.summary, 1800)])
   );
 
   const guidanceItems = sections
@@ -683,6 +697,8 @@ function sourceSummary(report, source, pairs = [], sections = [], learnerGuidanc
     sourceKey: source?.key || report?.source?.key || "",
     processedAt: report?.source?.processedAt || "",
     pairs,
+    takeaway: clean(learnerGuidance?.takeaway || "", 900),
+    limitation: clean(learnerGuidance?.limitation || "", 600),
     guidanceItems,
     backgroundSummary
   };

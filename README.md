@@ -59,11 +59,15 @@ Keeping both versions provides an audit trail and lets the richer source extract
 When a learner asks a relevant FX question, the application:
 
 1. selects only the relevant stored currency-pair sections;
-2. writes a compact explanation for a junior corporate banker with about one to two years of experience;
-3. shows that explanation in the **Internal Guidance** panel; and
-4. separately passes the richer source extract plus the stored simplified copy to the VIEW answer model.
+2. creates a short **What this means for your question** synthesis using only those internal sections;
+3. flags a material timeframe limitation explicitly when the learner's question goes beyond the report's stated horizon;
+4. writes shorter supporting explanations for each selected currency pair;
+5. shows the synthesis first and the pair-level detail underneath in the **Internal Guidance** panel; and
+6. separately passes the richer source extract plus the stored simplified copy to the VIEW answer model.
 
-The question-time explanation is not allowed to add current market facts, outside knowledge, recommendations or new implications. If that rewriting step fails, the page falls back to the stored simplified JSON rather than dropping the internal guidance entirely.
+The top synthesis may make a straightforward cross-rate inference when it follows directly from the selected internal pair views, but it must describe that as what the internal guidance *points to* or *would imply*, rather than as wording from the report. It cannot add current market facts, outside knowledge, recommendations or a new market view.
+
+The supporting pair rows no longer need to repeat the movement sentence already shown beside the pair. They focus on the main reason and the most important condition that could support or challenge the report view. If the question-time rewriting step fails, the page falls back to the stored simplified JSON rather than dropping the internal guidance entirely.
 
 ## Market-source context
 
@@ -102,7 +106,9 @@ The selected mode is preserved when the user generates another VIEW response.
 
 ## Refresh after deploying this version
 
-Because the internal report schema has changed from version 4 to version 5, rebuild the processed JSON after deployment.
+Version 1.4 does **not** change the stored schema from version 1.3. If your processed report is already schema version 5, you do not need to rebuild it just for the new Internal Guidance takeaway. The synthesis is generated at question time.
+
+If you are upgrading from schema version 4 or earlier, rebuild the processed JSON after deployment.
 
 The easiest route is the web manager:
 

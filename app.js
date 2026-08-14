@@ -196,6 +196,15 @@ function renderInternalGuidance(source) {
         </div>`;
     }).join("");
 
+  const takeaway = String(source.takeaway || "").trim();
+  const limitation = String(source.limitation || "").trim();
+  const takeawayBlock = takeaway ? `
+    <div class="guidance-takeaway" aria-label="What this means for your question">
+      <strong class="guidance-takeaway-title">What this means for your question</strong>
+      <p>${escapeHtml(takeaway)}</p>
+      ${limitation ? `<p class="guidance-limitation"><strong>Important limitation:</strong> ${escapeHtml(limitation)}</p>` : ""}
+    </div>` : "";
+
   return `
     <section class="internal-guidance" aria-label="Internal guidance">
       <div class="subsection-heading guidance-heading">
@@ -206,7 +215,8 @@ function renderInternalGuidance(source) {
         ${source.sourceKey ? `<a class="guidance-download" href="/api/fx-report/download" target="_blank" rel="noopener">Download PDF</a>` : ""}
       </div>
       <div class="guidance-body">
-        ${guidanceRows || `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
+        ${takeawayBlock}
+        ${guidanceRows ? `<div class="guidance-supporting-title">Supporting internal views</div>${guidanceRows}` : `<p class="guidance-fallback">${escapeHtml(source.backgroundSummary || "Relevant internal guidance was used.")}</p>`}
       </div>
     </section>`;
 }
